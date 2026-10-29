@@ -2,7 +2,9 @@
 
 A calm, hand-drawn railway builder in Three.js. You get unlimited track on a procedurally generated island. Built for iPad Pro in Safari, and it also works with a mouse or trackpad.
 
-**Play:** open the GitHub Pages URL. On iPad, *Share → Add to Home Screen* runs it full-screen.
+### ▶ [Play Inkwell Railways](https://asrijanga.github.io/train-game/)
+
+**Play:** open **https://asrijanga.github.io/train-game/** in Safari. On iPad, *Share → Add to Home Screen* runs it full-screen.
 
 ## How to play
 - **Track:** draw with one finger. Start on an existing line to branch off it, or finish on one to join it.
