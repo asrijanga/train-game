@@ -10,6 +10,8 @@ import { UI, el, sketchify } from './ui/ui.js';
 import { StationSystem } from './stations/stations.js';
 import { STYLES } from './stations/styles.js';
 import { TrainSystem } from './trains/trains.js';
+import { readSave, writeSave, clearSave, applySave } from './save.js';
+import { ICONS } from './ui/sketch.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -18,7 +20,10 @@ export class Game {
     this.say = say;
     this.clock = new THREE.Clock();
     this.time = 0;
-    this.seed = 1234;
+    this.save = readSave();
+    this.seed = this.save?.seed ?? (1 + Math.floor(Math.random() * 999983));
+    this.settings = { timeScale: 1, ...(this.save?.settings || {}) };
+    this.dirty = false;
   }
 
   async init() {
@@ -83,6 +88,18 @@ export class Game {
     this.setTool('explore');
     this.__TrackDraft = TrackDraft;
 
+    if (this.save) {
+      this.say('unrolling your map…');
+      await tick();
+      try { applySave(this, this.save); } catch (e) { console.warn('could not load save', e); }
+    } else {
+      this.introCamera();
+    }
+    this.buildHud();
+    setInterval(() => this.autosave(), 15000);
+    addEventListener('pagehide', () => this.autosave(true));
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.autosave(true); });
+
     this.input = new Input(renderer.domElement, this.rig, {
       onTap: (x, y) => this.onTap(x, y),
       wantsDraw: () => this.tool === 'track',
@@ -95,6 +112,87 @@ export class Game {
     addEventListener('resize', () => this.resize());
     this.resize();
     renderer.setAnimationLoop(() => this.frame());
+  }
+
+  introCamera() {
+    // start somewhere green and pleasant
+    let best = null;
+    for (let i = 0; i < 200; i++) {
+      const x = (Math.random() - 0.5) * 220, z = (Math.random() - 0.5) * 220;
+      const h = this.terrain.heightAt(x, z);
+      if (h < 1.5 || h > 9 || this.terrain.slopeAt(x, z) > 0.25) continue;
+      best = { x, z };
+      break;
+    }
+    if (best) { this.rig.goal.x = best.x; this.rig.goal.z = best.z; }
+    this.rig.goal.d = 150;
+    this.rig.setImmediate();
+  }
+
+  autosave(force = false) {
+    if (!this.dirty && !force) return;
+    if (writeSave(this)) this.dirty = false;
+  }
+
+  markDirty() {
+    this.dirty = true;
+  }
+
+  newIsland() {
+    if (!confirm('Start a fresh island? Your current railway will be packed away for good.')) return;
+    clearSave();
+    this.autosave = () => {};
+    location.reload();
+  }
+
+  buildHud() {
+    // title cartouche with gentle stats
+    const card = sketchify(el('div', 'cartouche'), '#f8f1de');
+    card.innerHTML = `<div class="ttl">Inkwell Railways</div><div class="stats"></div>`;
+    this.uiRoot.append(card);
+    this.statsEl = card.querySelector('.stats');
+    // top-right controls
+    const tr = el('div', 'topright');
+    const mk = (icon, title, fn) => { const b = sketchify(el('button', 'round', icon)); b.title = title; b.onclick = fn; tr.append(b); return b; };
+    this.speedBtn = mk(ICONS.play, 'Time speed', () => this.cycleSpeed());
+    mk(ICONS.gear, 'Settings', () => this.openSettings());
+    this.uiRoot.append(tr);
+    this.updateSpeedBtn();
+  }
+
+  cycleSpeed() {
+    const order = [1, 2, 4, 0];
+    const i = order.indexOf(this.settings.timeScale);
+    this.settings.timeScale = order[(i + 1) % order.length];
+    this.updateSpeedBtn();
+    this.markDirty();
+  }
+
+  updateSpeedBtn() {
+    const ts = this.settings.timeScale;
+    this.speedBtn.innerHTML = (ts === 0 ? ICONS.pause : ts === 1 ? ICONS.play : ICONS.fast) + (ts > 1 ? `<span class="badge">${ts}×</span>` : '');
+  }
+
+  openSettings() {
+    const box = el('div');
+    box.append(el('h2', '', 'Settings'));
+    box.append(el('p', '', `Island no. <b>${this.seed}</b>`));
+    const row = el('div', 'row');
+    const b = (label, fn) => { const x = sketchify(el('button', 'btn', label)); x.onclick = fn; row.append(x); return x; };
+    b('Save now', () => { this.autosave(true); this.ui.toast('Saved ✓'); });
+    b('New island', () => this.newIsland());
+    box.append(row);
+    this.settingsExtra?.(box);
+    box.append(el('p', 'blurb', '<i>Your railway saves itself every few moments.</i>'));
+    this.ui.showPanel(box);
+  }
+
+  updateStats() {
+    if (!this.statsEl) return;
+    let served = 0;
+    for (const s of this.stations.list) served += s.served;
+    const txt = `${this.stations.list.length} stations · ${this.trains.list.length} trains · ${served} happy travellers`;
+    if (txt !== this._stats) { this._stats = txt; this.statsEl.textContent = txt; }
   }
 
   resize() {
@@ -163,6 +261,7 @@ export class Game {
       const res = this.stations.place(hit.edge, hit.d, side);
       if (!res.ok) { this.ui.toast(res.reason); return; }
       this.undoStack.push(snap);
+      this.markDirty();
       this.ui.setUndoEnabled(true);
       this.openStation(res.station);
       return;
@@ -190,7 +289,7 @@ export class Game {
     btn('Change style', () => { this.pushUndo(); this.stations.cycleStyle(st); this.openStation(st); });
     btn('Rename', () => {
       const n = prompt('Name this station', st.name);
-      if (n && n.trim()) { st.name = n.trim().slice(0, 40); this.stations.buildView(st); this.openStation(st); }
+      if (n && n.trim()) { st.name = n.trim().slice(0, 40); this.stations.buildView(st); this.markDirty(); this.openStation(st); }
     });
     btn('Visit', () => this.rig.flyTo(st.center.x, st.center.z, 30));
     btn('Remove', () => { this.pushUndo(); this.stations.remove(st); this.ui.showPanel(null); });
@@ -245,6 +344,7 @@ export class Game {
   }
 
   pushUndo() {
+    this.markDirty();
     this.undoStack.push(this.snapshot());
     if (this.undoStack.length > 25) this.undoStack.shift();
     this.ui.setUndoEnabled(true);
@@ -254,6 +354,7 @@ export class Game {
     const s = this.undoStack.pop();
     if (!s) return;
     this.restore(s);
+    this.markDirty();
     this.ui.setUndoEnabled(this.undoStack.length > 0);
   }
 
@@ -284,9 +385,11 @@ export class Game {
   }
 
   frame() {
-    const dt = Math.min(this.clock.getDelta(), 0.1);
-    this.time += dt;
-    this.rig.update(dt);
+    const rdt = Math.min(this.clock.getDelta(), 0.1);
+    const dt = rdt * this.settings.timeScale;
+    this.time += rdt;
+    this.rig.update(rdt);
+    this.updateStats();
     this.updateSunShadow();
     this.water.uniforms.uTime.value = this.time;
     this.preview.update(this.time);
