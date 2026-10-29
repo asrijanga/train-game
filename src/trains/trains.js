@@ -42,11 +42,30 @@ export class TrainSystem {
     let nm = name;
     for (let i = 0; !nm && i < 30; i++) { const c = this.rng.pick(NAMES); if (!taken.has(c)) nm = c; }
     const t = new Train(this, { id: this.nextId++, name: nm || `Train ${this.nextId}`, livery, consist, stops, stopIdx: 0 });
-    t.spawnAt(st);
-    t.stopIdx = 1 % stops.length;
     this.list.push(t);
     this.group.add(t.group);
+    this.trySpawn(t);
     return t;
+  }
+
+  // Bring a train out of the depot onto its first platform once it is free.
+  trySpawn(t) {
+    const st = this.stations.byId(t.stops[0]);
+    if (!st) return false;
+    if (!this.platformFree(st, t)) {
+      t.pending = true;
+      t.group.visible = false;
+      t.status = `Waiting in the depot for ${st.name} to be free`;
+      return false;
+    }
+    t.pending = false;
+    t.group.visible = true;
+    t.stopIdx = 0;
+    t.spawnAt(st);
+    t.stopIdx = 1 % t.stops.length;
+    t.place();
+    this.effects?.puff(t.vehicles[0].group.position, 1.2, 10);
+    return true;
   }
 
   remove(t) {
@@ -85,6 +104,7 @@ export class TrainSystem {
   trainAt(p, r) {
     let best = null, bd = r + 1.2;
     for (const t of this.list) for (const v of t.vehicles) {
+      if (t.pending) continue;
       const d = v.group.position.distanceTo(p);
       if (d < bd) { bd = d; best = t; }
     }
@@ -93,10 +113,102 @@ export class TrainSystem {
 
   update(dt) {
     for (const t of this.list) {
+      if (t.pending) {
+        t._spawnTry = (t._spawnTry || 0) - dt;
+        if (t._spawnTry <= 0) { t._spawnTry = 1.5; this.trySpawn(t); }
+        continue;
+      }
       t.update(dt);
       this.emitSmoke(t, dt);
     }
     if (this.selected && this._statusEl) this._statusEl.textContent = this.selected.status;
+  }
+
+  // Distance along t's planned path until it would touch another train.
+  freeDistance(t, maxLook) {
+    let best = { dist: Infinity, blocker: null, opposing: false };
+    if (this.list.length < 2) return best;
+    const others = [];
+    for (const o of this.list) {
+      if (o === t || o.pending) continue;
+      if (t.ghost && t.ghost.other === o && t.odo < t.ghost.until) continue;
+      if (o.ghost && o.ghost.other === t && o.odo < o.ghost.until) continue;
+      others.push({ o, iv: o.bodyIntervals() });
+    }
+    if (t.ghost && t.odo >= t.ghost.until) t.ghost = null;
+    const p = t.plan;
+    let acc = 0;
+    const visit = (edge, dir, a, b) => {
+      for (const { o, iv } of others) for (const r of iv) {
+        if (r.edge !== edge) continue;
+        let d = Infinity;
+        if (dir > 0 && r.hi >= a && r.lo <= b) d = acc + Math.max(0, r.lo - a);
+        if (dir < 0 && r.lo <= a && r.hi >= b) d = acc + Math.max(0, a - r.hi);
+        if (d < best.dist) best = { dist: d, blocker: o, opposing: r.dir !== dir && o.state === 'run' };
+      }
+      acc += Math.abs(b - a);
+    };
+    const h = t.head;
+    if (!p) return best;
+    for (let i = p.idx; i < p.steps.length && acc < maxLook + t.length; i++) {
+      const st = p.steps[i];
+      const a = i === p.idx ? h.d : st.dir > 0 ? 0 : st.edge.length;
+      const last = i === p.steps.length - 1;
+      const b = last ? Math.min(st.edge.length, Math.max(0, p.stopD + st.dir * 2)) : st.dir > 0 ? st.edge.length : 0;
+      visit(st.edge, st.dir, a, b);
+    }
+    return best;
+  }
+
+  // Is another train on (or sitting at the end of) t's freshly planned route,
+  // coming the other way? Then wait at the platform for a while.
+  lineBusy(t, p) {
+    if (!p) return false;
+    const steps = new Map();
+    for (const st of p.steps) steps.set(st.edge, st.dir);
+    for (const o of this.list) {
+      if (o === t || o.pending) continue;
+      if (o.state !== 'run') continue;
+      for (const r of o.bodyIntervals()) {
+        const dir = steps.get(r.edge);
+        if (dir !== undefined && r.dir !== dir) return true;
+      }
+    }
+    return false;
+  }
+
+  // Routing cost for edges other trains are on: avoid oncoming traffic most.
+  edgePenalty(t) {
+    const occ = new Map();
+    for (const o of this.list) {
+      if (o === t || o.pending) continue;
+      const moving = o.state === 'run';
+      const ivs = o.bodyIntervals();
+      if (moving && o.plan) for (let i = o.plan.idx; i < o.plan.steps.length; i++) ivs.push({ edge: o.plan.steps[i].edge, dir: o.plan.steps[i].dir });
+      for (const r of ivs) {
+        const k = r.edge;
+        const e = occ.get(k) || { dir: 0, still: 0, moving: [] };
+        if (moving) e.moving.push(r.dir); else e.still += 1;
+        occ.set(k, e);
+      }
+    }
+    return (edge, dir) => {
+      const e = occ.get(edge);
+      if (!e) return 0;
+      let c = e.still * 160;
+      for (const d of e.moving) c += d === dir ? 15 : 600;
+      return c;
+    };
+  }
+
+  platformFree(st, t) {
+    for (const o of this.list) {
+      if (o === t || o.pending) continue;
+      for (const r of o.bodyIntervals()) {
+        if (r.edge === st.edge && r.hi > st.d - st.length / 2 - 3 && r.lo < st.d + st.length / 2 + 3) return false;
+      }
+    }
+    return true;
   }
 
   emitSmoke(t, dt) {
@@ -249,8 +361,7 @@ export class TrainSystem {
     this.draft = null;
     if (!t) { this.game.ui.toast('Could not place the train'); return; }
     // check the route exists from the first stop
-    const ok = t.replan(true);
-    if (!ok) this.game.ui.toast(t.status);
+    if (!t.route(true)) this.game.ui.toast(`Can't find a way to ${t.nextStation?.name ?? 'the next stop'} yet`);
     t.plan = null;
     t.state = 'dwell';
     t.timer = 2.5;
@@ -305,7 +416,10 @@ export class TrainSystem {
       const t = new Train(this, d);
       const edge = this.net.edges.get(d.head.edge);
       const trail = d.trail.map((s) => ({ ...s, edge: this.net.edges.get(s.edge) }));
-      if (!edge || trail.some((s) => !s.edge)) continue;
+      if (!edge || trail.some((s) => !s.edge)) {
+        if (d.pending) { this.list.push(t); this.group.add(t.group); t.pending = true; t.group.visible = false; }
+        continue;
+      }
       t.head = { edge, dir: d.head.dir, d: d.head.d };
       t.trail = trail;
       t.state = 'dwell';

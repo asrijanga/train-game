@@ -74,7 +74,7 @@ export class Train {
       this.trail = [{ edge, dir, from: d, to: d }];
       if (!this.extendTrail()) continue;
       const nxt = this.sys.stations.byId(this.stops[(this.stopIdx + 1) % this.stops.length]);
-      const r = nxt && findRoute(this.sys.net, [{ edge, dir, d }], { edge: nxt.edge, d: nxt.d }, this.length);
+      const r = nxt && findRoute(this.sys.net, [{ edge, dir, d }], { edge: nxt.edge, d: nxt.d }, this.length, this.sys.edgePenalty?.(this));
       const cost = r ? r.cost : 1e9;
       if (!best || cost < best.cost) best = { dir, d, cost };
     }
@@ -158,6 +158,21 @@ export class Train {
     }
   }
 
+  // Track intervals covered by this train's body: [{ edge, lo, hi, dir }]
+  bodyIntervals() {
+    const out = [];
+    let s = this.length;
+    for (let i = this.trail.length - 1; i >= 0 && s > 0; i--) {
+      const seg = this.trail[i];
+      const len = Math.abs(seg.to - seg.from);
+      const use = Math.min(len, s);
+      const a = seg.to, b = seg.to - seg.dir * use;
+      out.push({ edge: seg.edge, lo: Math.min(a, b) - 0.3, hi: Math.max(a, b) + 0.3, dir: seg.dir });
+      s -= use;
+    }
+    return out;
+  }
+
   totalTrail() {
     let t = 0;
     for (const s of this.trail) t += Math.abs(s.to - s.from);
@@ -203,14 +218,25 @@ export class Train {
     return starts;
   }
 
-  replan(allowReverse) {
+  route(allowReverse) {
     const st = this.nextStation;
-    if (!st) { this.plan = null; this.status = 'No stops'; return false; }
-    const r = findRoute(this.sys.net, this.plannedStarts(allowReverse), { edge: st.edge, d: st.d }, this.length);
-    if (!r) { this.plan = null; this.status = `Can't find a way to ${st.name}`; return false; }
+    if (!st) return null;
+    return findRoute(this.sys.net, this.plannedStarts(allowReverse), { edge: st.edge, d: st.d }, this.length, this.sys.edgePenalty?.(this));
+  }
+
+  applyRoute(r) {
+    const st = this.nextStation;
     if (r.reversed) this.reverse();
     this.plan = { steps: r.steps, idx: 0, stopD: r.stopD, endType: r.endType };
     this.status = r.endType === 'station' ? `Heading to ${st.name}` : 'Reversing…';
+  }
+
+  replan(allowReverse) {
+    const st = this.nextStation;
+    if (!st) { this.plan = null; this.status = 'No stops'; return false; }
+    const r = this.route(allowReverse);
+    if (!r) { this.plan = null; this.status = `Can't find a way to ${st.name}`; return false; }
+    this.applyRoute(r);
     return true;
   }
 
@@ -289,19 +315,53 @@ export class Train {
       this.speed = 0;
       this.timer -= dt;
       if (this.timer <= 0) {
-        if (this.replan(true)) { this.state = 'run'; this.atStation = null; this.sys.onDepart?.(this); }
-        else this.timer = 3;
+        const st = this.nextStation;
+        const r = this.route(true);
+        if (!r) {
+          this.status = st ? `Can't find a way to ${st.name}` : 'No stops';
+          this.timer = 3;
+        } else {
+          const hold = this.sys.lineBusy?.(this, r);
+          this.holdTime = (this.holdTime || 0) + (hold ? 1 : 0);
+          if (hold && this.holdTime < 12) {
+            this.status = 'Waiting for the line to clear';
+            this.timer = 1;
+          } else {
+            this.holdTime = 0;
+            this.applyRoute(r);
+            this.state = 'run';
+            this.blocked = 0;
+            this.atStation = null;
+            this.sys.onDepart?.(this);
+          }
+        }
       }
     } else if (this.state === 'run') {
       if (!this.plan) { this.state = 'dwell'; this.timer = 2; return; }
       const dist = this.distanceToTarget();
       const brake = 1.4;
-      let vt = Math.min(this.curveLimit(), Math.sqrt(2 * brake * Math.max(0, dist - 0.02)));
-      vt = this.sys.limitFor?.(this, vt) ?? vt;
+      const free = this.sys.freeDistance ? this.sys.freeDistance(this, Math.min(dist, 90)) : { dist: Infinity };
+      const room = Math.min(dist, free.dist - 1.6);
+      let vt = Math.min(this.curveLimit(), Math.sqrt(2 * brake * Math.max(0, room - 0.02)));
       if (this.speed < vt) this.speed = Math.min(vt, this.speed + this.accel * dt);
       else this.speed = Math.max(vt, this.speed - brake * 1.8 * dt);
-      const ds = Math.min(this.speed * dt, dist);
+      const ds = Math.max(0, Math.min(this.speed * dt, room));
       this.advance(ds);
+      if (free.dist - 1.6 < dist && room < 0.3) {
+        // held up by another train
+        this.blocked = (this.blocked || 0) + dt;
+        this.status = `Waiting for ${free.blocker.name}`;
+        const limit = free.opposing ? 6 : 30;
+        if (this.blocked > limit) {
+          // relaxed rules: let them slip past each other rather than stand forever
+          this.ghost = { other: free.blocker, until: this.odo + this.length + free.blocker.length + 6 };
+          this.blocked = 0;
+        }
+      } else {
+        this.blocked = 0;
+        const st = this.nextStation;
+        if (st && this.status.startsWith('Waiting')) this.status = `Heading to ${st.name}`;
+      }
       if (dist - ds < 0.03 && this.speed < 0.6) {
         this.speed = 0;
         if (this.plan.endType === 'reverse') {
@@ -386,6 +446,7 @@ export class Train {
   }
 
   serialize() {
+    if (this.pending || !this.head) return { id: this.id, name: this.name, livery: this.livery, consist: this.consistIds, stops: this.stops, stopIdx: 0, pending: true, head: { edge: -1 }, trail: [] };
     return {
       id: this.id, name: this.name, livery: this.livery, consist: this.consistIds,
       stops: this.stops, stopIdx: this.stopIdx,

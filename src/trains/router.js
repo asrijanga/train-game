@@ -1,7 +1,7 @@
 // Directional shortest-path search over the rail graph. A state is "travelling
 // along edge e in direction dir". Trains may only reverse at stations (the
 // start) or at dead ends.
-const REVERSE_PENALTY = 40;
+const REVERSE_PENALTY = 2500; // prefer carrying on round a loop over turning back
 const DEAD_END_PENALTY = 120;
 
 export function stopPoint(edge, stationD, dir, trainLen) {
@@ -12,7 +12,7 @@ export function stopPoint(edge, stationD, dir, trainLen) {
 // starts: [{ edge, dir, d, cost, reversed }]
 // goal: { edge, d } (station centre) ; trainLen
 // Returns { steps: [{edge, dir}], stopD, endType: 'station'|'reverse', reversed, cost } or null
-export function findRoute(net, starts, goal, trainLen) {
+export function findRoute(net, starts, goal, trainLen, penalty) {
   const best = new Map(); // key -> cost
   const prev = new Map(); // key -> { key, edge, dir }
   const open = [];
@@ -45,7 +45,7 @@ export function findRoute(net, starts, goal, trainLen) {
       }
     }
     const toEnd = dir > 0 ? edge.length - pos : pos;
-    const endCost = cur.cost + toEnd;
+    const endCost = cur.cost + toEnd + (penalty && !cur.start ? penalty(edge, dir) : 0);
     const { node, side } = edge.endOf(dir);
     const deps = net.departures(node, side);
     if (deps.length === 0) {
