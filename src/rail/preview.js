@@ -57,6 +57,8 @@ export class TrackPreview {
     this.marker.visible = false;
     this.group = new THREE.Group();
     this.group.add(this.mesh, this.marker);
+    this.mesh.layers.set(1);
+    this.marker.layers.set(1);
   }
 
   show(plan) {

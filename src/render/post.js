@@ -1,0 +1,258 @@
+import * as THREE from 'three';
+
+// Paper grain + fibres, generated once.
+function makePaperTexture() {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  // value noise at a few octaves
+  const rnd = (x, y) => {
+    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  };
+  const vnoise = (x, y, f) => {
+    const xi = Math.floor(x / f), yi = Math.floor(y / f);
+    const xf = x / f - xi, yf = y / f - yi;
+    const w = S / f;
+    const h = (a, b) => rnd(((a % w) + w) % w, ((b % w) + w) % w);
+    const sx = xf * xf * (3 - 2 * xf), sy = yf * yf * (3 - 2 * yf);
+    return (h(xi, yi) * (1 - sx) + h(xi + 1, yi) * sx) * (1 - sy) + (h(xi, yi + 1) * (1 - sx) + h(xi + 1, yi + 1) * sx) * sy;
+  };
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const n = vnoise(x, y, 64) * 0.4 + vnoise(x, y, 16) * 0.3 + vnoise(x, y, 4) * 0.2 + rnd(x, y) * 0.1;
+      const v = 200 + n * 55;
+      const i = (y * S + x) * 4;
+      img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v; img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  // fibres
+  g.globalAlpha = 0.07;
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * S, y = Math.random() * S, a = Math.random() * Math.PI, l = 4 + Math.random() * 18;
+    g.strokeStyle = Math.random() < 0.5 ? '#000' : '#fff';
+    g.lineWidth = 0.6 + Math.random();
+    g.beginPath();
+    g.moveTo(x, y);
+    g.quadraticCurveTo(x + Math.cos(a) * l * 0.5 + 2, y + Math.sin(a) * l * 0.5 - 2, x + Math.cos(a) * l, y + Math.sin(a) * l);
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  return t;
+}
+
+const vert = /* glsl */ `
+  varying vec2 vUv;
+  void main() { vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }
+`;
+
+const frag = /* glsl */ `
+  precision highp float;
+  uniform sampler2D tColor;
+  uniform sampler2D tDepth;
+  uniform sampler2D tPaper;
+  uniform vec2 uRes;
+  uniform float uScale;
+  uniform float uNear, uFar;
+  uniform mat4 uProjInv;
+  uniform mat4 uViewInv;
+  uniform vec3 uZenith, uHorizon, uSunDir, uSunColor, uInk;
+  uniform float uNight, uTime, uInkStrength, uHatch;
+  varying vec2 vUv;
+
+  float viewZ(float d) {
+    return (uNear * uFar) / ((uFar - uNear) * d - uFar);
+  }
+  float invZ(vec2 uv) {
+    float d = texture2D(tDepth, uv).r;
+    return -1.0 / viewZ(d);
+  }
+  float lum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+  }
+
+  vec3 skyColor(vec3 dir) {
+    float h = clamp(dir.y, -0.2, 1.0);
+    vec3 col = mix(uHorizon, uZenith, smoothstep(0.0, 0.55, h));
+    // watercolour clouds
+    vec2 cp = dir.xz / max(0.12, dir.y + 0.15) * 1.3 + vec2(uTime * 0.01, 0.0);
+    float cl = vnoise(cp * 1.4) * 0.6 + vnoise(cp * 3.1) * 0.3 + vnoise(cp * 7.0) * 0.1;
+    float cloud = smoothstep(0.55, 0.78, cl) * smoothstep(-0.02, 0.25, dir.y);
+    vec3 cloudCol = mix(vec3(1.0, 0.98, 0.94), uHorizon * 0.8, uNight * 0.8);
+    col = mix(col, cloudCol, cloud * 0.75);
+    // sun glow
+    float s = max(dot(dir, normalize(uSunDir)), 0.0);
+    col += uSunColor * pow(s, 64.0) * 0.5 * (1.0 - uNight);
+    col += uSunColor * pow(s, 6.0) * 0.12 * (1.0 - uNight);
+    // stars
+    if (uNight > 0.01) {
+      vec2 sp = dir.xz / max(0.05, dir.y + 0.05) * 40.0;
+      float st = step(0.985, hash(floor(sp))) * smoothstep(0.0, 0.3, dir.y);
+      col += vec3(st) * uNight * 0.9;
+    }
+    return col;
+  }
+
+  void main() {
+    vec2 px = uScale / uRes;
+    // hand-drawn wobble: sample edges through a slowly varying offset
+    vec2 wob = (vec2(vnoise(vUv * uRes / (90.0 * uScale)), vnoise(vUv * uRes / (90.0 * uScale) + 17.0)) - 0.5) * px * 1.6;
+    vec2 uv = vUv + wob;
+
+    float dC = texture2D(tDepth, vUv).r;
+    vec3 col = texture2D(tColor, vUv).rgb;
+
+    if (dC >= 0.99999) {
+      vec4 ndc = vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
+      vec4 vp = uProjInv * ndc;
+      vec3 dir = normalize((uViewInv * vec4(vp.xyz / vp.w, 0.0)).xyz);
+      col = skyColor(dir);
+    }
+
+    float zc = -viewZ(dC);
+    // inverse depth is affine across flat surfaces: its Laplacian finds creases
+    float wc = 1.0 / zc;
+    float wl = invZ(uv - vec2(px.x, 0.0)), wr = invZ(uv + vec2(px.x, 0.0));
+    float wd = invZ(uv - vec2(0.0, px.y)), wu = invZ(uv + vec2(0.0, px.y));
+    float lap = abs(wl + wr + wd + wu - 4.0 * wc) / wc;
+    float crease = smoothstep(0.012, 0.05, lap);
+    // silhouettes: big jumps in depth
+    float zl = 1.0 / wl, zr = 1.0 / wr, zd = 1.0 / wd, zu = 1.0 / wu;
+    float jump = max(max(abs(zl - zc), abs(zr - zc)), max(abs(zd - zc), abs(zu - zc))) / zc;
+    float sil = smoothstep(0.02, 0.08, jump);
+
+    // colour edges (windows, trims)
+    vec3 cl = texture2D(tColor, uv - vec2(px.x, 0.0)).rgb, cr = texture2D(tColor, uv + vec2(px.x, 0.0)).rgb;
+    vec3 cd = texture2D(tColor, uv - vec2(0.0, px.y)).rgb, cu = texture2D(tColor, uv + vec2(0.0, px.y)).rgb;
+    float ce = length(cl - cr) + length(cd - cu);
+    float cedge = smoothstep(0.22, 0.45, ce);
+
+    float far = smoothstep(260.0, 90.0, zc); // fade lines into the distance
+    float ink = max(sil, crease * 0.85);
+    ink = max(ink, cedge * 0.55);
+    ink *= far;
+    // broken, pencil-like strokes
+    float grain = vnoise(vUv * uRes / (3.0 * uScale));
+    ink *= smoothstep(0.1, 0.55, grain + 0.35);
+    ink = clamp(ink * uInkStrength, 0.0, 0.92);
+
+    // hatching in shade
+    float L = lum(col);
+    vec2 sp = vUv * uRes / uScale;
+    float hn = vnoise(sp * 0.02) * 6.0;
+    float h1 = smoothstep(0.55, 0.0, abs(fract((sp.x + sp.y + hn) / 7.0) - 0.5) * 7.0 - 0.2);
+    float h2 = smoothstep(0.55, 0.0, abs(fract((sp.x - sp.y + hn) / 6.0) - 0.5) * 6.0 - 0.2);
+    float shade = smoothstep(0.3, 0.12, L) * (1.0 - step(0.99999, dC));
+    float deep = smoothstep(0.16, 0.05, L) * (1.0 - step(0.99999, dC));
+    float hatch = (h1 * shade * 0.35 + h2 * deep * 0.3) * uHatch * far;
+
+    // paper
+    vec3 paper = texture2D(tPaper, sp / 512.0 * 0.9).rgb;
+    vec3 tint = vec3(1.0, 0.975, 0.93);
+    col = col * mix(vec3(1.0), paper * 1.18 * tint, 0.55);
+    // watercolour pigment pooling at colour boundaries
+    col *= 1.0 - cedge * 0.08;
+
+    col = mix(col, uInk, ink);
+    col = mix(col, uInk, hatch);
+
+    // soft sepia vignette
+    vec2 q = vUv - 0.5;
+    float vig = smoothstep(0.85, 0.35, length(q * vec2(1.0, 0.9)));
+    col = mix(col * vec3(0.86, 0.8, 0.72), col, vig);
+
+    gl_FragColor = vec4(col, 1.0);
+    #include <colorspace_fragment>
+  }
+`;
+
+export class PostFX {
+  constructor(renderer) {
+    this.renderer = renderer;
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.target = new THREE.WebGLRenderTarget(size.x, size.y, {
+      type: THREE.HalfFloatType,
+      samples: 4,
+      depthBuffer: true,
+    });
+    this.target.depthTexture = new THREE.DepthTexture(size.x, size.y);
+    this.target.depthTexture.type = THREE.UnsignedIntType;
+    this.uniforms = {
+      tColor: { value: this.target.texture },
+      tDepth: { value: this.target.depthTexture },
+      tPaper: { value: makePaperTexture() },
+      uRes: { value: size.clone() },
+      uScale: { value: renderer.getPixelRatio() },
+      uNear: { value: 0.5 },
+      uFar: { value: 3000 },
+      uProjInv: { value: new THREE.Matrix4() },
+      uViewInv: { value: new THREE.Matrix4() },
+      uZenith: { value: new THREE.Color('#9cc3d9') },
+      uHorizon: { value: new THREE.Color('#efe6cf') },
+      uSunDir: { value: new THREE.Vector3(0.5, 0.6, 0.3) },
+      uSunColor: { value: new THREE.Color('#fff1c9') },
+      uInk: { value: new THREE.Color('#2b2a33') },
+      uNight: { value: 0 },
+      uTime: { value: 0 },
+      uInkStrength: { value: 1 },
+      uHatch: { value: 1 },
+    };
+    this.material = new THREE.ShaderMaterial({ uniforms: this.uniforms, vertexShader: vert, fragmentShader: frag, depthTest: false, depthWrite: false });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
+    this.quad = new THREE.Mesh(geo, this.material);
+    this.quad.frustumCulled = false;
+    this.scene = new THREE.Scene();
+    this.scene.add(this.quad);
+    this.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.enabled = true;
+  }
+
+  setSize() {
+    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.target.setSize(size.x, size.y);
+    this.uniforms.uRes.value.copy(size);
+    this.uniforms.uScale.value = this.renderer.getPixelRatio();
+  }
+
+  render(scene, camera) {
+    const r = this.renderer;
+    const u = this.uniforms;
+    u.uNear.value = camera.near;
+    u.uFar.value = camera.far;
+    u.uProjInv.value.copy(camera.projectionMatrixInverse);
+    u.uViewInv.value.copy(camera.matrixWorld);
+    camera.layers.set(0);
+    if (this.enabled) {
+      r.setRenderTarget(this.target);
+      r.render(scene, camera);
+      r.setRenderTarget(null);
+      r.render(this.scene, this.cam);
+    } else {
+      r.setRenderTarget(null);
+      r.render(scene, camera);
+    }
+    // overlay layer (labels, drawing preview) stays crisp on top
+    const ac = r.autoClear;
+    r.autoClear = false;
+    r.clearDepth();
+    camera.layers.set(1);
+    const bg = scene.background, fog = scene.fog;
+    scene.background = null;
+    r.render(scene, camera);
+    scene.background = bg;
+    scene.fog = fog;
+    r.autoClear = ac;
+    camera.layers.set(0);
+  }
+}

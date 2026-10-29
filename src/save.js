@@ -71,7 +71,7 @@ export function applySave(game, data) {
     Object.assign(game.rig.goal, data.camera);
     game.rig.setImmediate();
   }
-  if (data.time !== undefined) game.clockTime = data.time;
+  if (data.time !== undefined && game.sky) game.sky.hour = data.time;
 }
 
 function delta(arr) {

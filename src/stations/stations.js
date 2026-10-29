@@ -231,7 +231,7 @@ export class StationSystem {
       bulb.position.copy(v);
       const glow = new THREE.Sprite(glowMat);
       glow.position.copy(v);
-      glow.scale.setScalar(2.2);
+      glow.scale.setScalar(1.25);
       grp.add(bulb, glow);
       st.lamps.push(v.clone());
     }
@@ -282,6 +282,7 @@ export class StationSystem {
     v.set(0, st.style === 'grand' ? 13 : 7, 3.5).applyMatrix4(m);
     sprite.position.copy(v);
     sprite.renderOrder = 30;
+    sprite.layers.set(1);
     sprite.center.set(0.5, 0);
     grp.add(sprite);
     st.label = sprite;

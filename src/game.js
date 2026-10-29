@@ -12,6 +12,8 @@ import { STYLES } from './stations/styles.js';
 import { TrainSystem } from './trains/trains.js';
 import { readSave, writeSave, clearSave, applySave } from './save.js';
 import { ICONS } from './ui/sketch.js';
+import { PostFX } from './render/post.js';
+import { Sky } from './render/sky.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -21,8 +23,11 @@ export class Game {
     this.clock = new THREE.Clock();
     this.time = 0;
     this.save = readSave();
-    this.seed = this.save?.seed ?? (1 + Math.floor(Math.random() * 999983));
-    this.settings = { timeScale: 1, ...(this.save?.settings || {}) };
+    const qs = new URLSearchParams(location.search);
+    const qseed = parseInt(qs.get('seed'), 10);
+    if (qseed && this.save?.seed !== qseed) this.save = null;
+    this.seed = this.save?.seed ?? (qseed || 1 + Math.floor(Math.random() * 999983));
+    this.settings = { timeScale: 1, dayCycle: 'cycle', ...(this.save?.settings || {}) };
     this.dirty = false;
   }
 
@@ -35,6 +40,7 @@ export class Game {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.container.appendChild(renderer.domElement);
     this.renderer = renderer;
+    this.post = new PostFX(renderer);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#e9e2cc');
@@ -55,6 +61,8 @@ export class Game {
     sc.left = -120; sc.right = 120; sc.top = 120; sc.bottom = -120; sc.near = 1; sc.far = 700;
     scene.add(sun, sun.target);
     this.sun = sun;
+    this.sunDir = new THREE.Vector3(0.55, 0.75, 0.35).normalize();
+    this.sky = new Sky(this);
 
     this.say('raising mountains…');
     await tick();
@@ -182,6 +190,14 @@ export class Game {
     b('Save now', () => { this.autosave(true); this.ui.toast('Saved ✓'); });
     b('New island', () => this.newIsland());
     box.append(row);
+    box.append(el('h3', '', 'Time of day'));
+    const tod = el('div', 'row');
+    for (const [id, label] of [['cycle', 'Day & night'], ['day', 'Always day'], ['golden', 'Golden hour'], ['night', 'Starry night']]) {
+      const x = sketchify(el('button', 'chip' + (this.settings.dayCycle === id ? ' on' : ''), label), this.settings.dayCycle === id ? '#f3dfb0' : '#fbf6e8');
+      x.onclick = () => { this.settings.dayCycle = id; this.markDirty(); this.openSettings(); };
+      tod.append(x);
+    }
+    box.append(tod);
     this.settingsExtra?.(box);
     box.append(el('p', 'blurb', '<i>Your railway saves itself every few moments.</i>'));
     this.ui.showPanel(box);
@@ -199,6 +215,7 @@ export class Game {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
+    this.post.setSize();
   }
 
   setTool(id) {
@@ -379,8 +396,7 @@ export class Game {
       sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span;
       sc.updateProjectionMatrix();
     }
-    const dir = new THREE.Vector3(0.55, 0.75, 0.35).normalize();
-    this.sun.position.copy(t).addScaledVector(dir, 300);
+    this.sun.position.copy(t).addScaledVector(this.sunDir, 300);
     this.sun.target.position.copy(t);
   }
 
@@ -394,9 +410,15 @@ export class Game {
     this.water.uniforms.uTime.value = this.time;
     this.preview.update(this.time);
     this.trains.update(dt);
-    this.stations.update(dt, (this.time / 60 + 9) % 12);
+    const cyc = this.settings.dayCycle;
+    if (cyc === 'cycle') this.sky.advance(dt, 24);
+    else this.sky.hour = { day: 11, golden: 17.9, night: 22.5 }[cyc] ?? 11;
+    this.clockTime = this.sky.hour;
+    this.sky.apply();
+    this.post.uniforms.uTime.value = this.time;
+    this.stations.update(dt, this.sky.hour % 12);
     this.stations.setLabelOpacity(THREE.MathUtils.smoothstep(this.rig.cur.d, 35, 70));
-    this.renderer.render(this.scene, this.camera);
+    this.post.render(this.scene, this.camera);
   }
 }
 
