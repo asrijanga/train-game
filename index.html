@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Inkwell" />
+    <meta name="theme-color" content="#f4ecd8" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <title>Inkwell Railways</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="ui"></div>
+    <div id="loading">
+      <div class="loading-card">
+        <h1>Inkwell Railways</h1>
+        <p class="loading-sub">a little railway, drawn by hand</p>
+        <svg class="loading-train" viewBox="0 0 120 50" aria-hidden="true">
+          <path d="M8 38 h96" stroke="#2b2a33" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+          <path d="M14 34 v-14 h26 v-8 h12 v8 h28 q10 0 10 10 v4 z" stroke="#2b2a33" stroke-width="2.4" fill="#b8322a" stroke-linejoin="round"/>
+          <path d="M62 20 v-10 h6 v10" stroke="#2b2a33" stroke-width="2.4" fill="#2d2c30"/>
+          <circle cx="26" cy="36" r="5" stroke="#2b2a33" stroke-width="2.4" fill="#f4ecd8"/>
+          <circle cx="50" cy="36" r="5" stroke="#2b2a33" stroke-width="2.4" fill="#f4ecd8"/>
+          <circle cx="74" cy="36" r="5" stroke="#2b2a33" stroke-width="2.4" fill="#f4ecd8"/>
+          <g class="puffs"><circle cx="66" cy="6" r="4" fill="#fff" stroke="#2b2a33" stroke-width="1.6"/><circle cx="76" cy="3" r="3" fill="#fff" stroke="#2b2a33" stroke-width="1.6"/></g>
+        </svg>
+        <p id="loading-msg">sharpening pencils…</p>
+      </div>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

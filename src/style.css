@@ -1,0 +1,77 @@
+@import '@fontsource/patrick-hand/400.css';
+@import '@fontsource/caveat/700.css';
+
+:root {
+  --ink: #2b2a33;
+  --paper: #f4ecd8;
+  --paper-2: #ebe0c4;
+  --accent: #b8322a;
+  --green: #3f7a52;
+  --blue: #2f5d8a;
+  --hand: 'Patrick Hand', 'Marker Felt', 'Comic Sans MS', system-ui, sans-serif;
+  --title: 'Caveat', 'Patrick Hand', cursive;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--hand);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-size: 20px;
+}
+
+#ui > * { pointer-events: auto; }
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  z-index: 100;
+  transition: opacity 0.9s ease;
+}
+
+#loading.done { opacity: 0; pointer-events: none; }
+
+.loading-card { text-align: center; }
+.loading-card h1 { font-family: var(--title); font-size: 76px; margin: 0; letter-spacing: 1px; }
+.loading-sub { margin: 0 0 18px; font-size: 22px; opacity: 0.75; }
+.loading-train { width: 220px; animation: chug 0.6s ease-in-out infinite alternate; }
+.loading-train .puffs { animation: puff 1.2s ease-out infinite; transform-origin: 70px 6px; }
+#loading-msg { font-size: 20px; opacity: 0.7; }
+
+@keyframes chug { from { transform: translateY(0); } to { transform: translateY(-2px); } }
+@keyframes puff { from { opacity: 1; transform: translate(0, 0) scale(0.8); } to { opacity: 0; transform: translate(12px, -8px) scale(1.4); } }
