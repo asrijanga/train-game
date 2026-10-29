@@ -12,6 +12,8 @@ const NAMES = [
   'Wandering Wren', 'Saffron Comet', 'Thunder Hollow', 'Iron Duke', 'Gentle Giant', 'Fen Flyer',
 ];
 
+const SM = new THREE.Vector3();
+
 export const CAR_TYPES = () => Object.entries(VEHICLES).filter(([, v]) => v.kind === 'car');
 export const LOCO_TYPES = () => Object.entries(VEHICLES).filter(([, v]) => v.kind === 'loco');
 
@@ -90,8 +92,45 @@ export class TrainSystem {
   }
 
   update(dt) {
-    for (const t of this.list) t.update(dt);
+    for (const t of this.list) {
+      t.update(dt);
+      this.emitSmoke(t, dt);
+    }
     if (this.selected && this._statusEl) this._statusEl.textContent = this.selected.status;
+  }
+
+  emitSmoke(t, dt) {
+    const fx = this.effects;
+    if (!fx || !dt) return;
+    for (const v of t.vehicles) {
+      if (!v.smoke) continue;
+      v.group.updateMatrixWorld();
+      const p = SM.copy(v.smoke[0]).applyMatrix4(v.group.matrixWorld);
+      if (v.steam) {
+        // chuffs: four per driving-wheel turn, bigger when working hard
+        const per = (2 * Math.PI * 0.34) / 4;
+        v._chuff = (v._chuff ?? 0) + t.speed * dt;
+        const busy = t.speed > 0.2;
+        if (busy && v._chuff > per) {
+          v._chuff = 0;
+          const k = Math.min(1, t.speed / 5);
+          fx.spawn(p.x, p.y, p.z, (Math.random() - 0.5) * 0.4, 2.2 + k * 1.2, (Math.random() - 0.5) * 0.4, 0.45 + k * 0.25, 2.6 + Math.random(), 2.2, 0.15);
+          this.game.audio?.chuff?.(t, k);
+        } else if (!busy) {
+          v._idle = (v._idle ?? 0) - dt;
+          if (v._idle <= 0) {
+            v._idle = 0.7 + Math.random() * 0.6;
+            fx.spawn(p.x, p.y, p.z, 0, 0.7, 0, 0.3, 3.2, 2.0, 0.05);
+          }
+        }
+      } else {
+        v._idle = (v._idle ?? 0) - dt;
+        if (v._idle <= 0) {
+          v._idle = t.speed > 0.2 ? 0.35 : 1.2;
+          fx.spawn(p.x, p.y, p.z, 0, 1.2, 0, 0.18, 1.6, 2.5, 0.75);
+        }
+      }
+    }
   }
 
   // ------------------------------------------------------------------ UI

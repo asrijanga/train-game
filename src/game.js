@@ -14,6 +14,10 @@ import { readSave, writeSave, clearSave, applySave } from './save.js';
 import { ICONS } from './ui/sketch.js';
 import { PostFX } from './render/post.js';
 import { Sky } from './render/sky.js';
+import { Scenery } from './world/scenery.js';
+import { Towns } from './world/towns.js';
+import { Life } from './world/life.js';
+import { Effects } from './render/effects.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -73,6 +77,22 @@ export class Game {
     await tick();
     this.water = createWater(this.terrain);
     scene.add(this.water.mesh);
+
+    this.say('building villages…');
+    await tick();
+    this.towns = new Towns(this);
+    this.towns.generate();
+    scene.add(this.towns.group);
+    this.terrain.recolorAll();
+    this.say('planting forests…');
+    await tick();
+    this.scenery = new Scenery(this);
+    this.scenery.generate((x, z) => this.towns.blocks(x, z));
+    scene.add(this.scenery.group);
+    this.life = new Life(this);
+    scene.add(this.life.group);
+    this.effects = new Effects();
+    scene.add(this.effects.mesh);
 
     this.rig = new CameraRig(this.camera, this.terrain);
     this.rig.setImmediate();
@@ -387,6 +407,21 @@ export class Game {
     if (s.trains) this.trains?.load?.(s.trains);
   }
 
+  chimneySmoke(dt) {
+    if (!dt) return;
+    this._chim = (this._chim ?? 0) - dt;
+    if (this._chim > 0) return;
+    this._chim = 0.35;
+    const t = this.rig.target;
+    const R = Math.max(90, this.rig.cur.d * 0.9);
+    const emit = (p) => {
+      if (Math.abs(p.x - t.x) > R || Math.abs(p.z - t.z) > R || Math.random() > 0.3) return;
+      this.effects.spawn(p.x, p.y, p.z, 0, 0.5, 0, 0.22, 4.5, 3.2, 0.25);
+    };
+    for (const tw of this.towns.list) for (const c of tw.chimneys || []) emit(c);
+    for (const st of this.stations.list) for (const c of st.smoke || []) emit(c);
+  }
+
   updateSunShadow() {
     // keep the shadow frustum centred on what the camera is looking at
     const t = this.rig.target;
@@ -418,6 +453,13 @@ export class Game {
     this.post.uniforms.uTime.value = this.time;
     this.stations.update(dt, this.sky.hour % 12);
     this.stations.setLabelOpacity(THREE.MathUtils.smoothstep(this.rig.cur.d, 35, 70));
+    this.towns.setLabelOpacity(THREE.MathUtils.smoothstep(this.rig.cur.d, 60, 110));
+    this.towns.update(dt);
+    this.scenery.update(this.time);
+    this.life.update(dt, this.time, this.camera);
+    this.chimneySmoke(dt);
+    this.effects.uniforms.uLight.value = 1 - this.sky.night * 0.55;
+    this.effects.update(rdt);
     this.post.render(this.scene, this.camera);
   }
 }

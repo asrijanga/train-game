@@ -35,6 +35,7 @@ export class Terrain {
     this.group.name = 'terrain';
     this.chunks = [];
     this.dirty = new Set();
+    this.painters = [];
     this.generate();
     this.buildMeshes();
     this.buildWaterDepthTexture();
@@ -226,6 +227,7 @@ export class Terrain {
       const snowLine = 31 + brush * 4;
       if (e > snowLine && slope < 1.3) out.lerp(tmpC.setRGB(0.96, 0.97, 1.0), smoothstep(snowLine, snowLine + 2.5, e));
     }
+    if (e >= 0.55) for (const p of this.painters) p(x, z, out);
     const d = this.disturb[k];
     if (d > 0) out.lerp(tmpC.setRGB(0.6, 0.53, 0.38), d * 0.75);
     const v = 1 + brush * 0.07;
@@ -294,6 +296,11 @@ export class Terrain {
     geo.attributes.color.needsUpdate = true;
     geo.computeBoundingSphere();
     geo.computeBoundingBox();
+  }
+
+  recolorAll() {
+    for (let i = 0; i < CHUNKS * CHUNKS; i++) this.dirty.add(i);
+    this.flush();
   }
 
   markDirty(ix0, iz0, ix1, iz1) {

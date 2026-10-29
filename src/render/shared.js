@@ -81,3 +81,12 @@ export function labelTexture(text, opts = {}) {
   tex.anisotropy = 4;
   return { tex, w, h };
 }
+
+export const tailGlowMat = new THREE.SpriteMaterial({
+  map: glowTexture(),
+  color: 0xff5a40,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+});

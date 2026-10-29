@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildVehicle, VEHICLES } from './vehicles.js';
 import { findRoute, REVERSE_PENALTY, stopPoint } from './router.js';
 import { RAIL_TOP } from '../rail/network.js';
+import { glowMat, tailGlowMat } from '../render/shared.js';
 
 const GAP = 0.12; // coupling gap between vehicles
 const DWELL = 7;
@@ -30,6 +31,18 @@ export class Train {
       const v = buildVehicle(id, this.livery);
       this.group.add(v.group);
       v.group.rotation.order = 'YZX';
+      if (v.headlight) {
+        const g = new THREE.Sprite(glowMat);
+        g.position.copy(v.headlight);
+        g.scale.setScalar(1.6);
+        v.group.add(g);
+      }
+      if (v.tailLamp) {
+        const g = new THREE.Sprite(tailGlowMat);
+        g.position.copy(v.tailLamp);
+        g.scale.setScalar(0.8);
+        v.group.add(g);
+      }
       return v;
     });
     let off = 0;
