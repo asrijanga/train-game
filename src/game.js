@@ -9,6 +9,7 @@ import { TrackPreview } from './rail/preview.js';
 import { UI, el, sketchify } from './ui/ui.js';
 import { StationSystem } from './stations/stations.js';
 import { STYLES } from './stations/styles.js';
+import { TrainSystem } from './trains/trains.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -72,6 +73,8 @@ export class Game {
     scene.add(this.rail.group);
     this.stations = new StationSystem(this);
     scene.add(this.stations.group);
+    this.trains = new TrainSystem(this);
+    scene.add(this.trains.group);
     this.preview = new TrackPreview(this.terrain);
     scene.add(this.preview.group);
 
@@ -101,10 +104,14 @@ export class Game {
   }
 
   setTool(id) {
+    const prev = this.tool;
     this.tool = id;
     this.drawCancel();
     this.ui.setTool(id);
     this.ui.setUndoEnabled(this.undoStack.length > 0);
+    if (this.trains && id !== 'train') this.trains.draft = null;
+    if (id === 'train') this.trains.openList();
+    else if (prev !== id) this.ui.showPanel(null);
   }
 
   pick(x, y) {
@@ -283,6 +290,7 @@ export class Game {
     this.updateSunShadow();
     this.water.uniforms.uTime.value = this.time;
     this.preview.update(this.time);
+    this.trains.update(dt);
     this.stations.update(dt, (this.time / 60 + 9) % 12);
     this.stations.setLabelOpacity(THREE.MathUtils.smoothstep(this.rig.cur.d, 35, 70));
     this.renderer.render(this.scene, this.camera);
