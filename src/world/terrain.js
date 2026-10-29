@@ -102,7 +102,7 @@ function lodIndex(step) {
 }
 
 export class Terrain {
-  constructor(seed) {
+  constructor(seed, defer = false) {
     this.seed = seed;
     this.noise = new Simplex(seed);
     this.noise2 = new Simplex(seed * 7 + 3);
@@ -117,9 +117,14 @@ export class Terrain {
     this.chunks = [];
     this.painters = [];
     this.generate();
+    this.buildWaterDepthTexture();
+    if (!defer) this.finish();
+  }
+
+  // Colour the land (after towns have registered their painters) and build meshes.
+  finish() {
     this.recolor(0, 0, N, N);
     this.buildMeshes();
-    this.buildWaterDepthTexture();
   }
 
   idx(ix, iz) {

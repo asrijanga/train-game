@@ -288,7 +288,12 @@ export class TrainSystem {
     const engines = el('div', 'row');
     for (const [id, v] of LOCO_TYPES()) {
       const b = sketchify(el('button', 'chip' + (d.loco === id ? ' on' : ''), v.name), d.loco === id ? '#f3dfb0' : '#fbf6e8');
-      b.onclick = () => { d.loco = id; this.renderDraft(); };
+      b.onclick = () => {
+        d.loco = id;
+        if (v.defaultCars) d.cars = v.defaultCars.slice();
+        else if (d.cars.includes('railcarTrailer')) d.cars = ['coach', 'coach'];
+        this.renderDraft();
+      };
       engines.append(b);
     }
     box.append(engines);

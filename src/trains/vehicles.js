@@ -605,6 +605,48 @@ function diningCar(liv) {
   return v;
 }
 
+function railcar(liv, trailer = false) {
+  // a little cream-and-blue electric railcar, like the one that runs over the sea
+  const k = new Kit();
+  const wheels = [];
+  const L = 4.6, lower = '#3d6fa8', upper = '#f2ead6', roof = '#8c8a86', dark = '#2d2c30';
+  k.box(L - 0.4, 0.16, 0.6, '#2f2e33', 0, 0.42, 0);
+  k.box(L - 0.5, 0.5, 0.9, lower, 0, 0.75, 0);
+  k.box(L - 0.5, 0.5, 0.9, upper, 0, 1.25, 0);
+  k.box(L - 0.48, 0.05, 0.92, '#e8c85a', 0, 1.0, 0);
+  // rounded ends with three-pane cab windows
+  for (const e of [-1, 1]) {
+    k.add(new THREE.CylinderGeometry(0.45, 0.45, 1.0, 12, 1, false, e > 0 ? -Math.PI / 2 : Math.PI / 2, Math.PI), lower, e * (L / 2 - 0.25), 0.75, 0, 0, 0, 0, 1, 0.5, 1);
+    k.add(new THREE.CylinderGeometry(0.45, 0.45, 1.0, 12, 1, false, e > 0 ? -Math.PI / 2 : Math.PI / 2, Math.PI), upper, e * (L / 2 - 0.25), 1.25, 0, 0, 0, 0, 1, 0.5, 1);
+    if (e > 0 || trailer) {
+      for (const z of [-0.26, 0, 0.26]) k.glass(0.04, 0.3, 0.22, e * (L / 2 + 0.17 - Math.abs(z) * 0.25), 1.3, z);
+      k.lamp(0.06, e * (L / 2 + 0.18), 0.82, 0.22);
+      k.lamp(0.06, e * (L / 2 + 0.18), 0.82, -0.22);
+      k.box(0.03, 0.12, 0.4, '#f8f4ea', e * (L / 2 + 0.18), 1.6, 0);
+    }
+  }
+  k.add(new THREE.CylinderGeometry(1, 1, 1, 16, 1, false, Math.PI / 2, Math.PI), roof, 0, 1.5, 0, Math.PI / 2, 0, Math.PI / 2, 0.46, L - 0.4, 0.12);
+  for (const z of [-0.455, 0.455]) {
+    for (let i = 0; i < 6; i++) k.glass(0.42, 0.32, 0.02, -L / 2 + 0.75 + i * 0.6, 1.27, z);
+    for (const x of [-1.6, 1.6]) k.box(0.42, 0.85, 0.02, lower, x, 0.95, z * 1.01);
+  }
+  if (!trailer) {
+    const px = 0.6, py = 1.62;
+    k.box(0.5, 0.06, 0.45, '#4a4d55', px, py, 0);
+    k.box(0.05, 0.05, 0.6, '#c9c6bf', px, py + 0.62, 0);
+    k.box(0.5, 0.03, 0.03, '#c9c6bf', px - 0.1, py + 0.32, 0, 0, 0, 1.0);
+    k.box(0.5, 0.03, 0.03, '#c9c6bf', px + 0.1, py + 0.32, 0, 0, 0, -1.0);
+  }
+  for (const x of [-L / 2 - 0.1, L / 2 + 0.1]) k.box(0.1, 0.12, 0.3, dark, x, 0.5, 0);
+  const grp = k.build();
+  const bg = new Kit();
+  bogie(bg, wheels, -1.45, 0.16, 0.7);
+  bogie(bg, wheels, 1.45, 0.16, 0.7);
+  grp.add(bg.build());
+  for (const w of wheels) grp.add(w.mesh);
+  return { group: grp, wheels, lit: true, headlight: trailer ? null : new THREE.Vector3(L / 2 + 0.2, 0.82, 0), cab: new THREE.Vector3(L / 2 - 0.15, 1.38, 0.18) };
+}
+
 // ---------------------------------------------------------------- catalogue
 
 export const VEHICLES = {
@@ -613,6 +655,8 @@ export const VEHICLES = {
   tank: { name: 'Little tank engine', kind: 'loco', length: 2.75, bogie: 1.5, maxSpeed: 5.5, accel: 1.2, build: tankEngine, blurb: 'A cheerful little engine for branch lines and short trains.' },
   diesel: { name: 'Comet diesel', kind: 'loco', length: 4.7, bogie: 2.55, maxSpeed: 10, accel: 1.3, build: dieselStreamliner, blurb: 'A streamlined diesel with a rounded nose and bold stripes.' },
   electric: { name: 'Swift electric', kind: 'loco', length: 5.1, bogie: 2.6, maxSpeed: 13, accel: 1.6, build: electricExpress, blurb: 'A sleek, quiet express that glides across the island.' },
+  railcar: { name: 'Seaside railcar', kind: 'loco', length: 5.1, bogie: 2.9, maxSpeed: 7.5, accel: 1.3, build: (l) => railcar(l), passengers: 20, defaultCars: ['railcarTrailer'], blurb: 'A cream-and-blue electric railcar that hums across the island, even over the water.' },
+  railcarTrailer: { name: 'Railcar trailer', kind: 'car', length: 5.1, bogie: 2.9, build: (l) => railcar(l, true), passengers: 20 },
   tender: { name: 'Tender', kind: 'tender', length: 2.7, bogie: 1.6, build: tender },
   woodTender: { name: 'Wood tender', kind: 'tender', length: 2.4, bogie: 1.1, build: woodTender },
   coach: { name: 'Coach', kind: 'car', length: 4.4, bogie: 2.8, build: coach, passengers: 24 },

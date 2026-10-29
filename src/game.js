@@ -42,6 +42,7 @@ export class Game {
   }
 
   async init() {
+
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(innerWidth, innerHeight);
@@ -77,7 +78,7 @@ export class Game {
 
     this.say('raising mountains…');
     await tick();
-    this.terrain = new Terrain(this.seed);
+    this.terrain = new Terrain(this.seed, true);
     scene.add(this.terrain.group);
 
     this.say('filling the lakes…');
@@ -94,7 +95,7 @@ export class Game {
     scene.add(this.towns.group);
     this.say('painting the meadows…');
     await tick();
-    this.terrain.recolorAll();
+    this.terrain.finish();
     this.say('planting forests…');
     await tick();
     this.scenery = new Scenery(this);

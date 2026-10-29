@@ -24,22 +24,31 @@ export class Life {
 
   // ---------------------------------------------------------------- clouds
   makeClouds() {
+    // big Ghibli cumulus: flat sunlit bases, billowing towers
     const rng = this.rng;
-    for (let i = 0; i < 28; i++) {
-      const mat = new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: toonGradient(), transparent: true, opacity: 0.92, depthWrite: false });
+    for (let i = 0; i < 26; i++) {
+      const mat = new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: toonGradient(), transparent: true, opacity: 0.95, depthWrite: false });
       const grp = new THREE.Group();
-      const n = rng.int(5, 9);
+      const tower = rng.chance(0.35);
+      const n = rng.int(7, 12);
+      const W = rng.float(12, 22);
       for (let k = 0; k < n; k++) {
-        const s = rng.float(3.5, 7);
+        const s = rng.float(5, 10) * (W / 16);
         const m = new THREE.Mesh(CLOUD_GEO, mat);
-        m.position.set(rng.float(-9, 9), rng.float(0, 2.5), rng.float(-5, 5));
-        m.scale.set(s * rng.float(1, 1.4), s * 0.7, s);
+        const up = tower ? rng.float(0, 1) : rng.float(0, 0.35);
+        m.position.set(rng.float(-W, W) * (1 - up * 0.6), up * W * (tower ? 1.4 : 0.6) + s * 0.3, rng.float(-W, W) * 0.5 * (1 - up * 0.5));
+        m.scale.set(s * rng.float(1, 1.3), s * 0.8, s);
         m.castShadow = true;
         grp.add(m);
       }
-      grp.position.set(rng.float(-HALF, HALF), rng.float(58, 78), rng.float(-HALF, HALF));
+      // flat base
+      const base = new THREE.Mesh(CLOUD_GEO, mat);
+      base.scale.set(W * 1.1, W * 0.18, W * 0.55);
+      base.castShadow = true;
+      grp.add(base);
+      grp.position.set(rng.float(-HALF, HALF), rng.float(85, 120), rng.float(-HALF, HALF));
       this.group.add(grp);
-      this.clouds.push({ grp, mat, speed: rng.float(1.2, 2.4) });
+      this.clouds.push({ grp, mat, speed: rng.float(1.5, 3) });
     }
   }
 
@@ -224,7 +233,7 @@ export class Life {
       if (c.grp.position.z > HALF * 1.3) c.grp.position.z = -HALF * 1.3;
       // fade clouds the camera is close to, so they never block the view
       const d = cam.position.distanceTo(c.grp.position);
-      c.mat.opacity = THREE.MathUtils.clamp((d - 25) / 60, 0, 0.92);
+      c.mat.opacity = THREE.MathUtils.clamp((d - 40) / 80, 0, 0.95);
       c.grp.visible = c.mat.opacity > 0.02;
     }
     this.updateBoats(dt, t);
@@ -233,7 +242,7 @@ export class Life {
   }
 }
 
-const CLOUD_GEO = new THREE.IcosahedronGeometry(1, 1);
+const CLOUD_GEO = new THREE.IcosahedronGeometry(1, 2);
 const BIRD_BODY = new THREE.BoxGeometry(0.5, 0.1, 0.12);
 const WING = (() => {
   const g = new THREE.BufferGeometry();
