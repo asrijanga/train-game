@@ -2,18 +2,16 @@ import * as THREE from 'three';
 import { toonGradient } from './materials.js';
 
 // Materials whose look changes with time of day; updated by the sky system.
-export const windowMat = new THREE.MeshToonMaterial({
+export const windowMat = new THREE.MeshLambertMaterial({
   color: new THREE.Color('#8fb3c4'),
-  gradientMap: toonGradient(),
   emissive: new THREE.Color('#ffc766'),
   emissiveIntensity: 0,
 });
 
 export const lampMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#efe6c8') });
 
-export const roofGlassMat = new THREE.MeshToonMaterial({
+export const roofGlassMat = new THREE.MeshLambertMaterial({
   color: new THREE.Color('#cfe3e8'),
-  gradientMap: toonGradient(),
   transparent: true,
   opacity: 0.55,
   side: THREE.DoubleSide,
@@ -49,7 +47,7 @@ export const glowMat = new THREE.SpriteMaterial({
 
 // Hand-lettered text on a paper banner, as a texture.
 export function labelTexture(text, opts = {}) {
-  const font = opts.font || '700 56px Caveat, "Patrick Hand", cursive';
+  const font = opts.font || '600 46px -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", sans-serif';
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
   g.font = font;
@@ -59,20 +57,26 @@ export function labelTexture(text, opts = {}) {
   c.height = h;
   g.font = font;
   if (opts.banner !== false) {
-    g.fillStyle = opts.bg || 'rgba(246,239,220,0.94)';
-    g.strokeStyle = '#2b2a33';
-    g.lineWidth = 3;
+    // a soft frosted pill, like the garden game's labels
+    const r = h / 2 - 6;
+    g.fillStyle = opts.bg || 'rgba(255, 246, 230, 0.82)';
+    g.shadowColor = 'rgba(60, 40, 18, 0.28)';
+    g.shadowBlur = 8;
+    g.shadowOffsetY = 2;
     g.beginPath();
-    const j = () => (Math.random() - 0.5) * 3;
-    g.moveTo(8 + j(), 10 + j());
-    g.lineTo(w - 8 + j(), 8 + j());
-    g.lineTo(w - 12 + j(), h - 10 + j());
-    g.lineTo(10 + j(), h - 8 + j());
+    g.moveTo(6 + r, 6);
+    g.lineTo(w - 6 - r, 6);
+    g.arc(w - 6 - r, h / 2, r, -Math.PI / 2, Math.PI / 2);
+    g.lineTo(6 + r, h - 6);
+    g.arc(6 + r, h / 2, r, Math.PI / 2, Math.PI * 1.5);
     g.closePath();
     g.fill();
+    g.shadowColor = 'transparent';
+    g.strokeStyle = 'rgba(255, 250, 240, 0.9)';
+    g.lineWidth = 2;
     g.stroke();
   }
-  g.fillStyle = opts.color || '#2b2a33';
+  g.fillStyle = opts.color || '#4a3423';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(text, w / 2, h / 2 + 3);

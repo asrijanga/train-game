@@ -25,7 +25,7 @@ export const groundUniforms = {
 };
 
 function terrainMaterial() {
-  const m = new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: toonGradient() });
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, groundUniforms);
     sh.vertexShader = 'varying vec3 vWP;\nvarying float vNY;\n' + sh.vertexShader.replace(
@@ -320,9 +320,10 @@ export class Terrain {
       if (e < -0.5) out.lerp(tmpC.setRGB(0.62, 0.66, 0.52), clamp(-e / 4, 0, 1));
     } else {
       // Ghibli meadows: saturated, sunlit greens with buttery dry patches
-      const dry = tmpC.setRGB(0.78, 0.8, 0.42);
-      out.setRGB(0.48, 0.72, 0.3).lerp(dry, clamp((0.45 - m) * 2.5, 0, 1));
-      out.lerp(tmpC.setRGB(0.27, 0.52, 0.25), clamp((m - 0.58) * 3, 0, 0.85));
+      // garden-game meadow tones: deep, mid and sunlit greens
+      const dry = tmpC.setRGB(0.65, 0.77, 0.37);
+      out.setRGB(0.47, 0.67, 0.29).lerp(dry, clamp((0.45 - m) * 2.5, 0, 1));
+      out.lerp(tmpC.setRGB(0.33, 0.52, 0.22), clamp((m - 0.58) * 3, 0, 0.85));
       const rocky = clamp((slope - 0.8) * 2.0, 0, 1) + clamp((e - 22) / 10, 0, 1) * 0.7;
       out.lerp(tmpC.setRGB(0.58, 0.55, 0.5), clamp(rocky, 0, 1));
       if (e > 26) out.lerp(tmpC.setRGB(0.5, 0.49, 0.52), clamp((e - 26) / 8, 0, 0.6));

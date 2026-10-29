@@ -15,7 +15,7 @@ export class Effects {
     geo.setAttribute('aOffset', new THREE.InstancedBufferAttribute(this.offset, 3).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute('aParams', new THREE.InstancedBufferAttribute(this.params, 4).setUsage(THREE.DynamicDrawUsage));
     geo.instanceCount = 0;
-    this.uniforms = { uLight: { value: 1 }, uInk: { value: new THREE.Color('#2b2a33') } };
+    this.uniforms = { uLight: { value: 1 }, uInk: { value: new THREE.Color('#c9c0b6') } };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
       transparent: true,
@@ -51,7 +51,7 @@ export class Effects {
           float swirl = smoothstep(0.02, 0.0, abs(length(p - vec2(0.06, 0.05)) - r * 0.45)) * step(0.0, sin(a * 1.0 + seed)) * 0.6;
           vec3 base = mix(vec3(0.97, 0.96, 0.93), vec3(0.62, 0.6, 0.6), vP.w);
           vec3 shade = base * (0.82 + 0.18 * smoothstep(0.3, -0.3, p.y - p.x * 0.3));
-          vec3 col = mix(shade, uInk, max(rim * 0.6, swirl * 0.35));
+          vec3 col = mix(shade, uInk, max(rim * 0.25, swirl * 0.12));
           float alpha = max(body, rim) * vP.y;
           gl_FragColor = vec4(col * uLight, alpha);
           #include <colorspace_fragment>

@@ -1,15 +1,13 @@
-@import '@fontsource/patrick-hand/400.css';
-@import '@fontsource/caveat/700.css';
 
 :root {
-  --ink: #2b2a33;
-  --paper: #f4ecd8;
+  --ink: #4a3423;
+  --paper: #f6ead4;
   --paper-2: #ebe0c4;
   --accent: #b8322a;
   --green: #3f7a52;
   --blue: #2f5d8a;
-  --hand: 'Patrick Hand', 'Marker Felt', 'Comic Sans MS', system-ui, sans-serif;
-  --title: 'Caveat', 'Patrick Hand', cursive;
+  --hand: -apple-system, BlinkMacSystemFont, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif;
+  --title: ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
@@ -22,7 +20,7 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--paper);
+  background: linear-gradient(#a9c6d6, #f2d0a8 70%, #e9b98f);
   color: var(--ink);
   font-family: var(--hand);
   -webkit-user-select: none;
@@ -59,7 +57,7 @@ html, body {
   inset: 0;
   display: grid;
   place-items: center;
-  background: var(--paper);
+  background: linear-gradient(#a9c6d6, #f2d0a8 70%, #e9b98f);
   z-index: 100;
   transition: opacity 0.9s ease;
 }
@@ -67,8 +65,9 @@ html, body {
 #loading.done { opacity: 0; pointer-events: none; }
 
 .loading-card { text-align: center; }
-.loading-card h1 { font-family: var(--title); font-size: 76px; margin: 0; letter-spacing: 1px; }
-.loading-sub { margin: 0 0 18px; font-size: 22px; opacity: 0.75; }
+.loading-card h1 { font-family: var(--title); font-weight: 700; font-size: 58px; margin: 0; color: #fffaf0; text-shadow: 0 2px 8px rgba(60, 35, 15, 0.35); }
+.loading-card { padding: 34px 46px; border-radius: 32px; background: rgba(255, 246, 230, 0.32); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid rgba(255, 250, 240, 0.55); box-shadow: 0 12px 40px rgba(60, 40, 18, 0.25); color: #fffaf0; }
+.loading-sub { margin: 0 0 18px; font-size: 19px; opacity: 0.9; text-shadow: 0 1px 3px rgba(60, 35, 15, 0.35); }
 .loading-train { width: 220px; animation: chug 0.6s ease-in-out infinite alternate; }
 .loading-train .puffs { animation: puff 1.2s ease-out infinite; transform-origin: 70px 6px; }
 #loading-msg { font-size: 20px; opacity: 0.7; }

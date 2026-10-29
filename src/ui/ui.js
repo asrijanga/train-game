@@ -1,4 +1,4 @@
-import { sketchBg, ICONS } from './sketch.js';
+import { ICONS } from './sketch.js';
 import './ui.css';
 
 const TOOLS = [
@@ -16,9 +16,10 @@ export function el(tag, cls, html) {
   return e;
 }
 
-let seedCounter = 1;
-export function sketchify(e, fill = '#f6efdc', stroke = '#2b2a33', opts) {
-  e.style.backgroundImage = sketchBg(fill, stroke, seedCounter++, opts);
+// Warm frosted-glass surfaces (the garden game's look). Accent fills tint the glass.
+export function sketchify(e, fill) {
+  e.classList.add('glass');
+  if (fill && fill !== '#f6efdc' && fill !== '#fbf6e8' && fill !== '#f8f1de') e.style.setProperty('--tint', fill);
   return e;
 }
 
@@ -29,16 +30,16 @@ export class UI {
     this.buttons = {};
 
     // toolbar
-    const bar = el('div', 'toolbar');
+    const bar = el('div', 'toolbar glass');
     for (const t of TOOLS) {
-      const b = sketchify(el('button', 'tool', `${ICONS[t.id]}<span>${t.label}</span>`));
+      const b = el('button', 'tool', `<span class="tool-face">${ICONS[t.id]}</span><span class="tool-name">${t.label}</span>`);
       b.addEventListener('click', () => game.setTool(t.id));
       bar.appendChild(b);
       this.buttons[t.id] = b;
     }
     const sep = el('div', 'tool-sep');
     bar.appendChild(sep);
-    const undo = sketchify(el('button', 'tool small', `${ICONS.undo}<span>Undo</span>`));
+    const undo = el('button', 'tool small', `<span class="tool-face">${ICONS.undo}</span><span class="tool-name">Undo</span>`);
     undo.addEventListener('click', () => game.undo());
     bar.appendChild(undo);
     this.undoBtn = undo;

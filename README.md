@@ -1,6 +1,6 @@
 # Inkwell Railways
 
-A calm, hand-drawn railway builder in Three.js. You get unlimited track on a procedurally generated island. Built for iPad Pro in Safari, and it also works with a mouse or trackpad.
+A calm, cozy, painterly railway builder in Three.js, in the same art style as [Garden](https://asrijanga.github.io/garden-game/). You get unlimited track on a procedurally generated island. Built for iPad Pro in Safari, and it also works with a mouse or trackpad.
 
 ### ▶ [Play Inkwell Railways](https://asrijanga.github.io/train-game/)
 

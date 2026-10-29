@@ -12,10 +12,10 @@ const PAL = [
   // spring, summer, autumn, winter (foliage)
   ['#3f6f45', '#2f6140', '#36603f', '#3c5a4a'], // pine
   ['#4f7e45', '#3b6a3f', '#6b6a3a', '#4a5c48'], // cedar
-  ['#97c95a', '#4f8f3c', '#e0952b', '#8b7a66'], // oak
-  ['#a9cf5e', '#5c9c44', '#d7362a', '#7d6a62'], // maple
-  ['#f7bfd3', '#5d9b47', '#cf6a2e', '#7f6c66'], // cherry
-  ['#bbd86c', '#6aa64a', '#f4c53a', '#8c7d68'], // ginkgo
+  ['#8dbb5a', '#5e9440', '#c98236', '#b9b2a8'], // oak
+  ['#a3c86a', '#6fa34a', '#b25a3a', '#a89e94'], // maple
+  ['#f2b8cb', '#6a9f48', '#c9763a', '#b0a59c'], // cherry
+  ['#a8cc68', '#7fae4f', '#d8a948', '#b9b0a2'], // ginkgo
   ['#7fae52', '#8c9be3', '#a2803e', '#6b7a5c'], // hydrangea (blue blooms in early summer)
   ['#9ccc5a', '#86c052', '#a7b85a', '#9ab072'], // bamboo
 ];
@@ -31,16 +31,16 @@ export const natureUniforms = {
 };
 
 function treeMaterial(mode) {
-  const m = new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: toonGradient() });
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true });
   m.defines = { [mode]: '' };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, windUniforms, seasonUniforms, natureUniforms);
     sh.vertexShader = `attribute vec2 aTree;
       uniform float uWindTime, uWindStrength; uniform vec2 uWindDir; uniform vec2 uNearC; uniform float uNearR;
-      varying float vSeed; varying float vSp; varying float vNY;\n` + sh.vertexShader.replace(
+      varying float vSeed; varying float vSp; varying float vNY; varying vec3 vLeaf;\n` + sh.vertexShader.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
-       vSeed = aTree.x; vSp = aTree.y; vNY = normal.y;
+       vSeed = aTree.x; vSp = aTree.y; vNY = normal.y; vLeaf = position * 2.3 + aTree.x * 31.0;
        vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
        float nd = distance(ip.xz, uNearC);
        #ifdef NEAR
@@ -55,7 +55,13 @@ function treeMaterial(mode) {
        transformed.xz += uWindDir * (sin(ph) * amp + uWindStrength * 0.02 * hh);`,
     );
     sh.fragmentShader = `uniform vec3 uPal[32]; uniform vec3 uAlt[8]; uniform vec4 uSeasonW;
-      varying float vSeed; varying float vSp; varying float vNY;\n` + sh.fragmentShader.replace(
+      varying float vSeed; varying float vSp; varying float vNY; varying vec3 vLeaf;
+      float lh(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+      float leafN(vec3 p) {
+        vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(lh(i), lh(i + vec3(1,0,0)), f.x), mix(lh(i + vec3(0,1,0)), lh(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(lh(i + vec3(0,0,1)), lh(i + vec3(1,0,1)), f.x), mix(lh(i + vec3(0,1,1)), lh(i + vec3(1,1,1)), f.x), f.y), f.z);
+      }\n` + sh.fragmentShader.replace(
       '#include <color_fragment>',
       `#include <color_fragment>
        {
@@ -68,7 +74,9 @@ function treeMaterial(mode) {
          float alt = step(0.55, vSeed) * (w.z + w.x * 0.4);
          sc = mix(sc, uAlt[sp], alt * 0.75);
          sc *= 0.86 + 0.28 * fract(vSeed * 7.13);
-         vec3 folC = sc * (0.75 + 0.3 * c.r);
+         // dappled clusters of leaves; light glows through the crown so it stays luminous
+         float dap = leafN(vLeaf * 2.5) * 0.6 + leafN(vLeaf * 6.0) * 0.4;
+         vec3 folC = sc * (0.78 + 0.3 * c.r) * (0.82 + 0.36 * dap) * 1.18;
          float snow = w.w * smoothstep(0.25, 0.75, vNY) * 0.9;
          folC = mix(folC, vec3(0.92, 0.94, 0.98), snow);
          diffuseColor.rgb = mix(c, folC, fol);
@@ -83,8 +91,23 @@ function treeMaterial(mode) {
 const W = '#ffffff', W2 = '#e6e6e6', W3 = '#d2d2d2';
 const BARK = '#6a4a35', BARK_D = '#4a3428', CHERRY_BARK = '#3f2c2a';
 
-function blob(k, x, y, z, sx, sy, sz, c = W, det = 0) {
-  k.add(new THREE.IcosahedronGeometry(1, det), c, x, y, z, x * 0.7, z * 0.9, 0, sx, sy, sz);
+// A canopy puff with soft spherical normals, so crowns shade like round clouds of leaves.
+const puffCache = new Map();
+function puff(det) {
+  let g = puffCache.get(det);
+  if (!g) {
+    g = new THREE.IcosahedronGeometry(1, det);
+    const p = g.attributes.position, n = g.attributes.normal;
+    for (let i = 0; i < p.count; i++) {
+      const l = Math.hypot(p.getX(i), p.getY(i), p.getZ(i)) || 1;
+      n.setXYZ(i, p.getX(i) / l, p.getY(i) / l, p.getZ(i) / l);
+    }
+    puffCache.set(det, g);
+  }
+  return g;
+}
+function blob(k, x, y, z, sx, sy, sz, c = W, det = 1) {
+  k.add(puff(det), c, x, y, z, x * 0.7, z * 0.9, 0, sx, sy, sz);
 }
 
 const MODELS = {
@@ -116,7 +139,7 @@ const MODELS = {
   [SP.MAPLE]: (k) => {
     k.cyl(0.11, 1.3, BARK_D, 0, 0.65, 0, 'y', 6, 0.08);
     for (const [x, y, z, s] of [[0, 1.7, 0, 1.05], [0.55, 2.2, 0.2, 0.75], [-0.5, 2.25, -0.2, 0.7], [0.05, 2.75, 0, 0.62]]) {
-      k.add(new THREE.IcosahedronGeometry(1, 0), y > 2 ? W : W2, x, y, z, 0, x, 0, s * 1.1, s * 0.5, s * 1.1);
+      k.add(puff(1), y > 2 ? W : W2, x, y, z, 0, x, 0, s * 1.1, s * 0.5, s * 1.1);
     }
   },
   [SP.CHERRY]: (k) => {
@@ -162,7 +185,7 @@ function geoFrom(fn) {
 function farGeo() {
   const k = new Kit();
   k.cyl(0.12, 1.2, BARK, 0, 0.6, 0, 'y', 4);
-  k.add(new THREE.IcosahedronGeometry(1, 0), W, 0, 2.1, 0, 0, 0, 0, 1.1, 1.0, 1.1);
+  k.add(puff(0), W, 0, 2.1, 0, 0, 0, 0, 1.1, 1.0, 1.1);
   return k.build().children[0].geometry;
 }
 
@@ -175,7 +198,7 @@ function rockGeo() {
 
 // ------------------------------------------------------------------ flowers & grass
 function flowerMaterial() {
-  const m = new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: toonGradient(), side: THREE.DoubleSide });
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, windUniforms, seasonUniforms);
     sh.vertexShader = `attribute vec4 aFlower; uniform float uWindTime, uWindStrength; uniform vec2 uWindDir; uniform vec4 uSeasonW;
@@ -374,7 +397,7 @@ export class Scenery {
       this.nearMeshes[sp] = m;
       this.group.add(m);
     }
-    const rock = new THREE.InstancedMesh(rockGeo(), new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: toonGradient() }), 3000);
+    const rock = new THREE.InstancedMesh(rockGeo(), new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }), 3000);
     rock.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     rock.count = 0;
     rock.castShadow = true;
