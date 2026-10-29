@@ -140,6 +140,12 @@ export class Game {
       onDrawMove: (x, y) => this.drawMove(x, y),
       onDrawEnd: () => this.drawEnd(),
       onDrawCancel: () => this.drawCancel(),
+      onCabExit: () => this.ui.setTool(this.tool),
+      onAnyTouch: () => {
+        this.idle = 0;
+        if (this.relax) { this.setRelax(false); return true; }
+        return false;
+      },
     });
 
     addEventListener('resize', () => this.resize());
@@ -187,10 +193,74 @@ export class Game {
     // top-right controls
     const tr = el('div', 'topright');
     const mk = (icon, title, fn) => { const b = sketchify(el('button', 'round', icon)); b.title = title; b.onclick = fn; tr.append(b); return b; };
+    mk(ICONS.camera, 'Relax & watch', () => this.setRelax(true));
     this.speedBtn = mk(ICONS.play, 'Time speed', () => this.cycleSpeed());
     mk(ICONS.gear, 'Settings', () => this.openSettings());
     this.uiRoot.append(tr);
     this.updateSpeedBtn();
+  }
+
+  // Hide the interface and let the camera wander through the railway.
+  setRelax(on) {
+    this.relax = on;
+    this.uiRoot.classList.toggle('relaxing', on);
+    if (on) {
+      this.ui.showPanel(null);
+      this.tourT = 0;
+      this.tourShot = -1;
+      this.nextShot();
+      this.ui.toast('Relax mode · touch anywhere to come back', 2600);
+    } else {
+      this.rig.exitCab();
+      this.rig.follow = null;
+      this.rig.followYaw = false;
+      this.ui.setTool(this.tool);
+    }
+  }
+
+  nextShot() {
+    const trains = this.trains.list.filter((t) => !t.pending);
+    const stations = this.stations.list;
+    const rig = this.rig;
+    rig.exitCab();
+    rig.follow = null;
+    rig.followYaw = false;
+    this.orbit = null;
+    const kinds = trains.length ? ['chase', 'cab', 'side', 'station', 'aerial'] : stations.length ? ['station', 'aerial'] : ['aerial'];
+    this.tourShot = (this.tourShot + 1 + Math.floor(Math.random() * 2)) % kinds.length;
+    const kind = kinds[this.tourShot];
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    this.tourT = kind === 'cab' ? 22 : 16;
+    if (kind === 'chase' || kind === 'side') {
+      const t = pick(trains);
+      this.trains.followTrain(t);
+      rig.followYaw = kind === 'chase';
+      rig.goal.d = kind === 'chase' ? 15 : 26;
+      rig.goal.tilt = kind === 'chase' ? -0.12 : 0.05;
+      if (kind === 'side') rig.goal.yaw = t.leadHeading() + Math.PI / 2;
+    } else if (kind === 'cab') {
+      this.trains.rideCab(pick(trains));
+      this.ui.setHint('');
+    } else if (kind === 'station') {
+      const st = pick(stations);
+      rig.flyTo(st.center.x, st.center.z, 30);
+      rig.goal.tilt = -0.05;
+      this.orbit = 0.08;
+    } else {
+      rig.flyTo(rig.goal.x + (Math.random() - 0.5) * 80, rig.goal.z + (Math.random() - 0.5) * 80, 190);
+      rig.goal.tilt = -0.1;
+      this.orbit = 0.03;
+    }
+  }
+
+  updateRelax(dt) {
+    if (!this.relax) {
+      this.idle = (this.idle || 0) + dt;
+      return;
+    }
+    this.tourT -= dt;
+    if (this.orbit) this.rig.goal.yaw += this.orbit * dt;
+    if (this.tourT <= 0) this.nextShot();
   }
 
   cycleSpeed() {
@@ -479,6 +549,7 @@ export class Game {
     const rdt = Math.min(this.clock.getDelta(), 0.1);
     const dt = rdt * this.settings.timeScale;
     this.time += rdt;
+    this.updateRelax(rdt);
     this.rig.update(rdt);
     this.updateStats();
     this.audio.update(rdt);

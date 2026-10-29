@@ -75,6 +75,7 @@ export class TrainSystem {
     this.list = this.list.filter((x) => x !== t);
     if (this.selected === t) this.select(null);
     if (this.game.rig.follow?.train === t) this.game.rig.follow = null;
+    if (this.game.rig.cab && t.vehicles.includes(this.game.rig.cab.vehicle)) this.game.rig.exitCab();
   }
 
   onNetEvent(ev) {
@@ -383,6 +384,14 @@ export class TrainSystem {
     if (rig.goal.d > 60) rig.goal.d = 38;
   }
 
+  rideCab(t) {
+    const v = t.vehicles[0];
+    this.followTrain(t);
+    this.game.rig.enterCab(v);
+    this.game.ui.showPanel(null);
+    this.game.ui.setHint('Riding in the cab · drag to look around · pinch to step out');
+  }
+
   select(t) {
     this.selected = t;
     if (!t) { this._statusEl = null; return; }
@@ -400,7 +409,8 @@ export class TrainSystem {
     const row = el('div', 'row');
     const b = (label, fn) => { const x = sketchify(el('button', 'btn', label)); x.onclick = fn; row.append(x); };
     b('Follow', () => this.followTrain(t));
-    b('Ride along', () => { this.followTrain(t); this.game.rig.followYaw = true; this.game.rig.goal.d = 14; this.game.rig.goal.tilt = -0.1; });
+    b('Chase', () => { this.followTrain(t); this.game.rig.followYaw = true; this.game.rig.goal.d = 16; this.game.rig.goal.tilt = -0.08; });
+    b('Cab ride', () => this.rideCab(t));
     b('Remove', () => { this.game.pushUndo(); this.remove(t); this.game.ui.showPanel(null); });
     box.append(row);
     this.game.ui.showPanel(box);

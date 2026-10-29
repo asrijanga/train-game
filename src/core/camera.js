@@ -38,6 +38,11 @@ export class CameraRig {
   }
 
   update(dt) {
+    if (this.cab) {
+      this.updateCab(dt);
+      return;
+    }
+    if (this.camera.near !== 0.5) { this.camera.near = 0.5; this.camera.updateProjectionMatrix(); }
     if (this.follow) {
       const p = this.follow.getPosition(tmpV);
       this.goal.x = p.x;
@@ -89,6 +94,45 @@ export class CameraRig {
     }
     cam.lookAt(this.target);
     cam.updateMatrixWorld();
+  }
+
+  // First-person ride in the locomotive cab, looking down the line.
+  updateCab(dt) {
+    const v = this.cab.vehicle;
+    const cam = this.camera;
+    if (cam.near !== 0.12) { cam.near = 0.12; cam.updateProjectionMatrix(); }
+    v.group.updateMatrixWorld();
+    const eye = tmpA.copy(v.cab || tmpB.set(0, 1.5, 0)).applyMatrix4(v.group.matrixWorld);
+    const fwd = tmpB.set(1, -0.06, 0).transformDirection(v.group.matrixWorld);
+    // a little sway and look-around
+    const sw = Math.sin(performance.now() / 600) * 0.012;
+    eye.y += sw;
+    if (!this._cabEye) { this._cabEye = eye.clone(); this._cabLook = fwd.clone(); }
+    const k = 1 - Math.exp(-dt * 10);
+    this._cabEye.lerp(eye, k);
+    this._cabLook.lerp(fwd, 1 - Math.exp(-dt * 4)).normalize();
+    cam.position.copy(this._cabEye);
+    const yawOff = this.cabYaw || 0;
+    const look = tmpV.copy(this._cabLook).applyAxisAngle(UPV, yawOff);
+    cam.lookAt(tmpA.copy(cam.position).add(look));
+    cam.updateMatrixWorld();
+    this.target.copy(cam.position).addScaledVector(look, 20);
+    this.groundY = this.terrain.groundAt(this.target.x, this.target.z);
+    this.cur.x = this.goal.x = this.target.x;
+    this.cur.z = this.goal.z = this.target.z;
+  }
+
+  enterCab(vehicle) {
+    this.cab = { vehicle };
+    this._cabEye = null;
+    this.cabYaw = 0;
+  }
+
+  exitCab() {
+    if (!this.cab) return;
+    this.cab = null;
+    this.goal.d = Math.max(this.goal.d, 20);
+    this.cur.d = this.goal.d;
   }
 
   // World point on the horizontal plane through the target, under screen px.
@@ -173,3 +217,4 @@ export class CameraRig {
 const tmpA = new THREE.Vector3();
 const tmpB = new THREE.Vector3();
 const tmpV = new THREE.Vector3();
+const UPV = new THREE.Vector3(0, 1, 0);

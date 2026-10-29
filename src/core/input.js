@@ -30,6 +30,7 @@ export class Input {
 
   down(e) {
     e.preventDefault();
+    if (this.h.onAnyTouch?.()) return;
     try { this.el.setPointerCapture(e.pointerId); } catch { /* ignore */ }
     const p = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), button: e.button, type: e.pointerType };
     this.pointers.set(e.pointerId, p);
@@ -83,6 +84,12 @@ export class Input {
         else break;
       // falls through
       case 'pan': {
+        if (this.rig.cab) {
+          this.rig.cabYaw = (this.rig.cabYaw || 0) - (p.x - this.prev.x) * 0.005;
+          this.rig.cabYaw = Math.max(-1.6, Math.min(1.6, this.rig.cabYaw));
+          this.prev = { x: p.x, y: p.y };
+          break;
+        }
         this.rig.follow = null;
         this.rig.grab(this.prev.x, this.prev.y, p.x, p.y);
         this.panSamples.push({ t: performance.now(), x: this.rig.goal.x, z: this.rig.goal.z });
@@ -115,6 +122,7 @@ export class Input {
       case 'nav2': {
         const m = this.metrics();
         const pv = this.prev;
+        if (this.rig.cab) { this.rig.exitCab(); this.h.onCabExit?.(); }
         this.rig.follow = null;
         if (pv.dist > 0 && m.dist > 0) {
           let da = m.ang - pv.ang;
@@ -170,6 +178,7 @@ export class Input {
 
   wheel(e) {
     e.preventDefault();
+    if (this.rig.cab) { this.rig.exitCab(); this.h.onCabExit?.(); }
     this.rig.follow = null;
     if (e.ctrlKey) {
       // trackpad pinch

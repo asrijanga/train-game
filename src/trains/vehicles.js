@@ -156,7 +156,7 @@ function steamPacific(liv) {
       r.piston.position.set(hx + plen / 2, yc, r.piston.position.z);
     }
   };
-  return { group: grp, wheels, animate, smoke: [new THREE.Vector3(1.5, 1.62, 0)], steam: true, headlight: new THREE.Vector3(1.86, 0.68, 0), cab: new THREE.Vector3(-1.3, 1.4, 0) };
+  return { group: grp, wheels, animate, smoke: [new THREE.Vector3(1.5, 1.62, 0)], steam: true, headlight: new THREE.Vector3(1.86, 0.68, 0), cab: new THREE.Vector3(-1.05, 1.55, 0.62) };
 }
 
 function tender(liv) {
@@ -361,7 +361,7 @@ function american(liv) {
     wheels.push({ mesh: w, r: 0.17 });
   }
   const animate = steamMotion(grp, drivers, R, R, { cylX: 0.85, yc: 0.42, z0: 0.31, Lr: 0.85, rc: 0.13 });
-  return { group: grp, wheels, animate, smoke: [new THREE.Vector3(1.45, 1.98, 0)], steam: true, headlight: new THREE.Vector3(1.66, 1.48, 0) };
+  return { group: grp, wheels, animate, smoke: [new THREE.Vector3(1.45, 1.98, 0)], steam: true, headlight: new THREE.Vector3(1.66, 1.48, 0), cab: new THREE.Vector3(-0.95, 1.55, 0.6) };
 }
 
 function woodTender(liv) {
@@ -425,7 +425,7 @@ function tankEngine(liv) {
     wheels.push({ mesh: w, r: R });
   }
   const animate = steamMotion(grp, drivers, R, R, { cylX: 0.78, yc: 0.36, z0: 0.29, Lr: 0.6, rc: 0.1 });
-  return { group: grp, wheels, animate, smoke: [new THREE.Vector3(1.05, 1.58, 0)], steam: true, headlight: new THREE.Vector3(1.33, 0.62, 0) };
+  return { group: grp, wheels, animate, smoke: [new THREE.Vector3(1.05, 1.58, 0)], steam: true, headlight: new THREE.Vector3(1.33, 0.62, 0), cab: new THREE.Vector3(-0.25, 1.45, 0.58) };
 }
 
 function dieselStreamliner(liv) {
@@ -460,7 +460,7 @@ function dieselStreamliner(liv) {
   bogie(bg, wheels, 1.15, 0.17, 0.75);
   grp.add(bg.build());
   for (const w of wheels) grp.add(w.mesh);
-  return { group: grp, wheels, smoke: [new THREE.Vector3(-1.0, 1.66, 0)], headlight: new THREE.Vector3(L / 2 - 0.4, 1.05, 0) };
+  return { group: grp, wheels, smoke: [new THREE.Vector3(-1.0, 1.66, 0)], headlight: new THREE.Vector3(L / 2 - 0.4, 1.05, 0), cab: new THREE.Vector3(L / 2 - 0.95, 1.38, 0) };
 }
 
 function electricExpress(liv) {
@@ -493,7 +493,7 @@ function electricExpress(liv) {
   bogie(bg, wheels, 1.0, 0.16, 0.7);
   grp.add(bg.build());
   for (const w of wheels) grp.add(w.mesh);
-  return { group: grp, wheels, headlight: new THREE.Vector3(L / 2 - 0.1, 0.85, 0) };
+  return { group: grp, wheels, headlight: new THREE.Vector3(L / 2 - 0.1, 0.85, 0), cab: new THREE.Vector3(L / 2 - 1.25, 1.33, 0) };
 }
 
 function boxcar(liv) {
