@@ -9,7 +9,7 @@ export const PLAT_H = 0.34;
 
 export const STYLES = {
   country: { label: 'Country halt', length: 18 },
-  village: { label: 'Village station', length: 20 },
+  village: { label: 'Town station', length: 20 },
   lakeside: { label: 'Lakeside pier', length: 18 },
   alpine: { label: 'Alpine lodge', length: 18 },
   forest: { label: 'Lumber halt', length: 18 },
@@ -94,29 +94,41 @@ function chimney(g, x, z, y0, y1, col) {
   g.smoke.push([x, y1 + 0.35, z]);
 }
 
+function tiledRoofS(g, x0, x1, z0, z1, y, h, tile = '#4b5560', o = 0.4) {
+  const dark = C(tile);
+  g.solid.gable(x0, x1, z0, z1, y, h, dark, C('#3a3633'), o, 0.1);
+  const zm = (z0 + z1) / 2;
+  g.solid.abox(x0 - o - 0.05, y + h - 0.02, zm - 0.1, x1 + o + 0.05, y + h + 0.12, zm + 0.1, dark);
+  for (const xe of [x0 - o - 0.05, x1 + o - 0.14]) g.solid.abox(xe, y + h + 0.08, zm - 0.13, xe + 0.19, y + h + 0.3, zm + 0.13, dark);
+}
+
 function country(g, L) {
-  const wall = C(PALETTE.cream), trim = C(PALETTE.green), roof = C(PALETTE.roofRed), base = C(PALETTE.stoneDark);
-  const bz0 = 2.5, bz1 = 5.1, bx = 2.6, wh = 2.4;
-  g.solid.abox(-bx - 0.1, 0, bz0 - 0.1, bx + 0.1, PLAT_H + 0.25, bz1 + 0.1, base);
-  g.solid.abox(-bx, PLAT_H, bz0, bx, PLAT_H + wh, bz1, wall);
-  // corner boards and clapboard lines
-  for (const sx of [-bx, bx]) for (const sz of [bz0, bz1]) g.solid.abox(sx - 0.07, PLAT_H, sz - 0.07, sx + 0.07, PLAT_H + wh, sz + 0.07, trim);
-  for (let y = PLAT_H + 0.4; y < PLAT_H + wh; y += 0.32) g.solid.abox(-bx, y, bz0 - 0.02, bx, y + 0.03, bz0, C('#d9c99e'));
-  g.solid.gable(-bx, bx, bz0, bz1, PLAT_H + wh, 1.3, roof, wall, 0.35);
-  door(g, 0, PLAT_H, bz0, 0.8, 1.6, trim, C(PALETTE.white));
-  windowAt(g, -1.5, PLAT_H + 1.3, bz0, 0.7, 0.8, C(PALETTE.white));
-  windowAt(g, 1.5, PLAT_H + 1.3, bz0, 0.7, 0.8, C(PALETTE.white));
-  windowAt(g, -1.5, PLAT_H + 1.3, bz1, 0.7, 0.8, C(PALETTE.white), 1);
-  windowAt(g, 1.5, PLAT_H + 1.3, bz1, 0.7, 0.8, C(PALETTE.white), 1);
-  chimney(g, 1.6, (bz0 + bz1) / 2 + 0.4, PLAT_H + wh + 0.5, PLAT_H + wh + 1.7, C(PALETTE.brick));
-  canopy(g, -bx - 0.6, bx + 0.6, PLAT_Z0 + 0.3, bz0, 2.15, roof, trim, C(PALETTE.white));
+  // a little wooden halt with a tiled roof, benches and tubs of flowers
+  const wood = C('#6b4630'), plaster = C('#efe6d0'), dark = C('#3a2a20');
+  const bz0 = 2.5, bz1 = 4.6, bx = 1.9, wh = 1.9;
+  g.solid.abox(-bx - 0.1, 0, bz0 - 0.1, bx + 0.1, PLAT_H + 0.15, bz1 + 0.1, C(PALETTE.stoneDark));
+  g.solid.abox(-bx, PLAT_H, bz0, bx, PLAT_H + wh, bz1, plaster);
+  for (const sx of [-bx, -bx / 3, bx / 3, bx]) g.solid.abox(sx - 0.07, PLAT_H, bz0 - 0.07, sx + 0.07, PLAT_H + wh, bz0 + 0.02, wood);
+  g.solid.abox(-bx, PLAT_H, bz0 - 0.05, bx, PLAT_H + 0.5, bz0, wood);
+  g.solid.abox(-bx, PLAT_H + wh - 0.15, bz0 - 0.07, bx, PLAT_H + wh, bz0, wood);
+  door(g, 0, PLAT_H, bz0, 0.8, 1.45, C('#8a6a45'), wood);
+  for (const x of [-1.25, 1.25]) {
+    windowAt(g, x, PLAT_H + 1.1, bz0, 0.6, 0.55, wood);
+    for (let k = -2; k <= 2; k++) g.solid.abox(x + k * 0.1 - 0.012, PLAT_H + 0.85, bz0 - 0.08, x + k * 0.1 + 0.012, PLAT_H + 1.35, bz0 - 0.05, dark);
+  }
+  tiledRoofS(g, -bx, bx, bz0, bz1, PLAT_H + wh, 1.0);
+  canopy(g, -bx - 1.5, bx + 1.5, PLAT_Z0 + 0.3, bz0, 2.05, C('#4b5560'), wood, wood);
   bench(g, -L / 2 + 3, 1.6);
   bench(g, L / 2 - 3.5, 1.6);
-  for (const x of [-L / 2 + 1.2, -4.5, 4.5, L / 2 - 1.2]) lampPost(g, x, 1.85);
-  flowerTub(g, -bx - 1.1, 1.7);
-  flowerTub(g, bx + 1.1, 1.7, '#7b5cc4');
-  sign(g, -L / 2 + 5.5, 2.05, 1.5, C(PALETTE.white), trim);
-  picketFence(g, -L / 2 + 0.5, L / 2 - 0.5, PLAT_Z1 + 0.05, C(PALETTE.white), [-bx - 0.2, bx + 0.2]);
+  for (const x of [-L / 2 + 1.2, -4.5, 4.5, L / 2 - 1.2]) lampPost(g, x, 1.85, 1.9, wood);
+  flowerTub(g, -bx - 1.1, 1.75, '#e97ab0');
+  flowerTub(g, bx + 1.1, 1.75, '#6f86e6');
+  flowerTub(g, bx + 1.6, 1.95, '#f4c23a');
+  sign(g, -L / 2 + 5.5, 2.05, 1.5, C(PALETTE.white), wood);
+  for (let x = -L / 2 + 0.5; x <= L / 2 - 0.5; x += 0.2) {
+    if (x > -bx - 0.3 && x < bx + 0.3) continue;
+    g.solid.abox(x - 0.03, PLAT_H, PLAT_Z1 - 0.03, x + 0.03, PLAT_H + 0.6, PLAT_Z1 + 0.03, C('#b8b26a'));
+  }
 }
 
 function picketFence(g, x0, x1, z, col, gap) {
@@ -129,32 +141,37 @@ function picketFence(g, x0, x1, z, col, gap) {
 }
 
 function village(g, L) {
-  const brick = C(PALETTE.brick), stone = C(PALETTE.stone), slate = C(PALETTE.roofSlate), trim = C(PALETTE.cream);
-  const bz0 = 2.5, bz1 = 5.6;
-  // central two-storey block with wings
-  g.solid.abox(-1.8, PLAT_H, bz0, 1.8, PLAT_H + 4.0, bz1, brick);
-  g.solid.abox(-4.4, PLAT_H, bz0 + 0.2, -1.8, PLAT_H + 2.5, bz1 - 0.2, brick);
-  g.solid.abox(1.8, PLAT_H, bz0 + 0.2, 4.4, PLAT_H + 2.5, bz1 - 0.2, brick);
-  for (const y of [PLAT_H + 0.02, PLAT_H + 2.0]) g.solid.abox(-1.85, y, bz0 - 0.05, 1.85, y + 0.14, bz1 + 0.05, stone);
-  g.solid.abox(-4.45, PLAT_H, bz0 + 0.15, 4.45, PLAT_H + 0.3, bz1 - 0.15, stone);
-  for (const sx of [-1.8, 1.8]) g.solid.abox(sx - 0.12, PLAT_H, bz0 - 0.08, sx + 0.12, PLAT_H + 4.0, bz0 + 0.1, stone);
-  g.solid.hip(-1.8, 1.8, bz0, bz1, PLAT_H + 4.0, 1.4, slate, 0.3);
-  g.solid.gable(-4.4, -1.8, bz0 + 0.2, bz1 - 0.2, PLAT_H + 2.5, 1.0, slate, brick, 0.3);
-  g.solid.gable(1.8, 4.4, bz0 + 0.2, bz1 - 0.2, PLAT_H + 2.5, 1.0, slate, brick, 0.3);
-  door(g, 0, PLAT_H, bz0, 1.0, 1.75, C('#5a3324'), stone);
-  for (const x of [-3.1, 3.1]) windowAt(g, x, PLAT_H + 1.25, bz0 + 0.2, 0.8, 1.0, trim);
-  for (const x of [-0.9, 0.9]) windowAt(g, x, PLAT_H + 3.0, bz0, 0.6, 0.85, trim);
-  for (const x of [-3.1, 0, 3.1]) windowAt(g, x, PLAT_H + 1.25, x === 0 ? bz1 : bz1 - 0.2, 0.8, 1.0, trim, 1);
-  // clock above the door
-  g.solid.cyl(0, PLAT_H + 2.35, bz0 - 0.08, 0.38, PLAT_H + 2.35, trim, 12);
-  g.clocks.push([0, PLAT_H + 2.45, bz0 - 0.12, 0.34]);
-  chimney(g, -1.0, bz1 - 0.8, PLAT_H + 4.3, PLAT_H + 5.6, brick);
-  chimney(g, 1.0, bz1 - 0.8, PLAT_H + 4.3, PLAT_H + 5.6, brick);
-  canopy(g, -L / 2 + 2, L / 2 - 2, PLAT_Z0 + 0.3, bz0, 2.3, slate, C('#2f4a3c'), trim);
-  for (const x of [-L / 2 + 1.2, -6, 6, L / 2 - 1.2]) lampPost(g, x, 1.9);
+  // an old timber town station: tiled roof, noren, red lanterns and a clock
+  const wood = C('#5a3a26'), plaster = C('#f1ead9'), dark = C('#3a2a20'), tile = '#4b5560';
+  const bz0 = 2.5, bz1 = 5.8;
+  g.solid.abox(-4.6, 0, bz0 - 0.1, 4.6, PLAT_H + 0.2, bz1 + 0.1, C(PALETTE.stoneDark));
+  g.solid.abox(-4.4, PLAT_H, bz0, 4.4, PLAT_H + 2.4, bz1, plaster);
+  g.solid.abox(-4.4, PLAT_H, bz0 - 0.04, 4.4, PLAT_H + 0.8, bz0, wood);
+  for (let x = -4.4; x <= 4.41; x += 1.1) g.solid.abox(x - 0.08, PLAT_H, bz0 - 0.08, x + 0.08, PLAT_H + 2.4, bz0 + 0.02, wood);
+  g.solid.abox(-4.4, PLAT_H + 2.25, bz0 - 0.08, 4.4, PLAT_H + 2.4, bz0, wood);
+  g.solid.abox(-1.4, PLAT_H, bz0 - 0.5, 1.4, PLAT_H + 3.2, bz0 + 0.6, plaster);
+  for (const sx of [-1.4, 1.4]) g.solid.abox(sx - 0.1, PLAT_H, bz0 - 0.55, sx + 0.1, PLAT_H + 3.2, bz0 - 0.35, wood);
+  door(g, 0, PLAT_H, bz0 - 0.5, 1.4, 1.8, dark, wood);
+  for (const sx of [-0.45, 0, 0.45]) g.solid.abox(sx - 0.21, PLAT_H + 1.3, bz0 - 0.62, sx + 0.21, PLAT_H + 1.85, bz0 - 0.58, C('#2f4f7a'));
+  g.solid.cyl(0, PLAT_H + 2.55, bz0 - 0.56, 0.36, PLAT_H + 2.55, plaster, 12);
+  g.clocks.push([0, PLAT_H + 2.62, bz0 - 0.6, 0.32]);
+  tiledRoofS(g, -1.5, 1.5, bz0 - 0.5, bz0 + 0.6, PLAT_H + 3.2, 0.9, tile, 0.35);
+  for (const x of [-3.1, -2.2, 2.2, 3.1]) {
+    windowAt(g, x, PLAT_H + 1.45, bz0, 0.6, 0.8, wood);
+    for (let k = -2; k <= 2; k++) g.solid.abox(x + k * 0.1 - 0.012, PLAT_H + 1.1, bz0 - 0.09, x + k * 0.1 + 0.012, PLAT_H + 1.8, bz0 - 0.06, dark);
+  }
+  for (const x of [-3, 0, 3]) windowAt(g, x, PLAT_H + 1.45, bz1, 0.8, 0.8, wood, 1);
+  tiledRoofS(g, -4.4, 4.4, bz0, bz1, PLAT_H + 2.4, 1.3, tile, 0.5);
+  for (const sx of [-1.75, 1.75]) {
+    g.solid.abox(sx - 0.02, PLAT_H + 1.75, bz0 - 0.62, sx + 0.02, PLAT_H + 2.1, bz0 - 0.58, dark);
+    g.solid.cyl(sx, PLAT_H + 1.35, bz0 - 0.6, 0.18, PLAT_H + 1.78, C('#d94f3d'), 10, 0.18);
+    g.lamps.push([sx, PLAT_H + 1.55, bz0 - 0.6]);
+  }
+  canopy(g, -L / 2 + 2, L / 2 - 2, PLAT_Z0 + 0.3, bz0 - 0.5, 2.3, C(tile), wood, wood);
+  for (const x of [-L / 2 + 1.2, -6, 6, L / 2 - 1.2]) lampPost(g, x, 1.9, 1.9, wood);
   bench(g, -5.5, 1.75); bench(g, 5.5, 1.75);
-  flowerTub(g, -2.3, 1.85); flowerTub(g, 2.3, 1.85, '#f08a3a');
-  sign(g, L / 2 - 4, 2.05, 1.6, C(PALETTE.blue), C('#2f3b36'));
+  flowerTub(g, -2.3, 1.85, '#e97ab0'); flowerTub(g, 2.3, 1.85, '#f08a3a');
+  sign(g, L / 2 - 4, 2.05, 1.6, C(PALETTE.white), wood);
 }
 
 function lakeside(g, L) {
@@ -248,36 +265,35 @@ function forest(g, L) {
 }
 
 function grand(g, L) {
-  const stone = C('#d8ccb2'), stoneD = C('#b3a68b'), roof = C(PALETTE.roofSlate), iron = C('#3f4f4a'), trim = C(PALETTE.cream);
-  const bz0 = 2.6, bz1 = 7.2, bx = 7;
-  g.solid.abox(-bx, PLAT_H, bz0, bx, PLAT_H + 3.6, bz1, stone);
-  g.solid.abox(-bx - 0.1, PLAT_H, bz0 - 0.1, bx + 0.1, PLAT_H + 0.5, bz1 + 0.1, stoneD);
-  g.solid.abox(-bx - 0.15, PLAT_H + 3.5, bz0 - 0.15, bx + 0.15, PLAT_H + 3.75, bz1 + 0.15, stoneD);
-  for (let x = -bx + 0.9; x <= bx - 0.9; x += 1.55) {
-    if (Math.abs(x) < 1.6) continue;
-    windowAt(g, x, PLAT_H + 1.8, bz0, 0.8, 1.6, trim);
-    windowAt(g, x, PLAT_H + 1.8, bz1, 0.8, 1.6, trim, 1);
-    g.solid.cyl(x, PLAT_H + 2.6, bz0 - 0.06, 0.4, PLAT_H + 2.6, stoneD, 8);
+  // a red-brick terminus with white stone bands and green copper domes
+  const brick = C('#a8503a'), band = C('#efe6d4'), dome = C('#5f8f7a'), iron = C('#3f4f4a'), trim = C(PALETTE.cream), slate = C('#4b5560');
+  const bz0 = 2.6, bz1 = 7.2, bx = 7.5;
+  g.solid.abox(-bx, PLAT_H, bz0, bx, PLAT_H + 4.0, bz1, brick);
+  g.solid.abox(-bx - 0.1, PLAT_H, bz0 - 0.1, bx + 0.1, PLAT_H + 0.5, bz1 + 0.1, band);
+  for (const y of [1.9, 3.2]) g.solid.abox(-bx - 0.05, PLAT_H + y, bz0 - 0.06, bx + 0.05, PLAT_H + y + 0.18, bz1 + 0.06, band);
+  g.solid.abox(-bx - 0.15, PLAT_H + 3.9, bz0 - 0.15, bx + 0.15, PLAT_H + 4.15, bz1 + 0.15, band);
+  for (let x = -bx + 0.9; x <= bx - 0.9; x += 1.25) {
+    if (Math.abs(x) < 2.2) continue;
+    windowAt(g, x, PLAT_H + 1.2, bz0, 0.6, 1.0, band);
+    windowAt(g, x, PLAT_H + 2.65, bz0, 0.6, 0.8, band);
+    windowAt(g, x, PLAT_H + 1.6, bz1, 0.6, 1.2, band, 1);
   }
-  for (let x = -bx; x <= bx; x += 1.55) g.solid.abox(x - 0.12, PLAT_H, bz0 - 0.12, x + 0.12, PLAT_H + 3.5, bz0, stoneD);
-  g.solid.hip(-bx, bx, bz0, bz1, PLAT_H + 3.75, 1.6, roof, 0.3);
-  // central clock tower
-  const tz = (bz0 + bz1) / 2;
-  g.solid.abox(-1.3, PLAT_H, bz0 - 0.4, 1.3, PLAT_H + 7.5, bz0 + 2.2, stone);
-  g.solid.abox(-1.4, PLAT_H + 7.5, bz0 - 0.5, 1.4, PLAT_H + 7.8, bz0 + 2.3, stoneD);
-  g.solid.hip(-1.4, 1.4, bz0 - 0.5, bz0 + 2.3, PLAT_H + 7.8, 2.6, C('#4e6d6a'), 0.15);
-  g.solid.cyl(0, PLAT_H + 10.3, bz0 + 0.9, 0.05, PLAT_H + 11.3, C(PALETTE.brass), 5, 0.02);
-  g.solid.cyl(0, PLAT_H + 6.0, bz0 - 0.42, 0.75, PLAT_H + 6.0, trim, 16);
-  g.clocks.push([0, PLAT_H + 6.0, bz0 - 0.45, 0.68]);
-  door(g, 0, PLAT_H, bz0 - 0.4, 1.4, 2.4, C('#5a3324'), stoneD);
-  windowAt(g, 0, PLAT_H + 4.1, bz0 - 0.4, 0.9, 1.4, trim);
-  for (const x of [-bx + 1, bx - 1]) chimney(g, x, tz, PLAT_H + 4.2, PLAT_H + 5.8, stoneD);
-  // grand iron & glass train shed spanning platform and track
+  g.solid.hip(-bx, bx, bz0, bz1, PLAT_H + 4.15, 1.2, slate, 0.3);
+  for (const [cx, r, h] of [[-bx + 1.3, 1.5, 5.4], [bx - 1.3, 1.5, 5.4], [0, 1.9, 6.2]]) {
+    g.solid.abox(cx - r, PLAT_H, bz0 - 0.4, cx + r, PLAT_H + h, bz0 + 2.6, brick);
+    g.solid.abox(cx - r - 0.05, PLAT_H + h - 0.25, bz0 - 0.45, cx + r + 0.05, PLAT_H + h, bz0 + 2.65, band);
+    g.solid.cyl(cx, PLAT_H + h, bz0 + 1.1, r * 0.95, PLAT_H + h + 0.5, dome, 8, r * 0.95);
+    g.solid.cyl(cx, PLAT_H + h + 0.5, bz0 + 1.1, r * 0.95, PLAT_H + h + 2.0, dome, 8, 0.12);
+    g.solid.cyl(cx, PLAT_H + h + 2.0, bz0 + 1.1, 0.06, PLAT_H + h + 2.7, C(PALETTE.brass), 5, 0.02);
+  }
+  g.solid.cyl(0, PLAT_H + 4.9, bz0 - 0.42, 0.7, PLAT_H + 4.9, trim, 16);
+  g.clocks.push([0, PLAT_H + 4.9, bz0 - 0.45, 0.62]);
+  door(g, 0, PLAT_H, bz0 - 0.4, 1.6, 2.4, C('#5a3324'), band);
+  for (const x of [-bx + 1, bx - 1]) chimney(g, x, (bz0 + bz1) / 2 + 0.8, PLAT_H + 4.5, PLAT_H + 5.8, brick);
   const h0 = PLAT_H + 3.2, span0 = -2.2, span1 = PLAT_Z1 + 0.2;
   for (let x = -L / 2 + 0.6; x <= L / 2 - 0.5; x += 3) {
     g.solid.cyl(x, PLAT_H - 0.3, span0, 0.1, h0, iron, 6);
     g.solid.cyl(x, PLAT_H, span1, 0.1, h0, iron, 6);
-    // arched rib
     let prev = null;
     for (let k = 0; k <= 8; k++) {
       const a = (k / 8) * Math.PI;
@@ -287,7 +303,6 @@ function grand(g, L) {
       prev = [z, y];
     }
   }
-  // glazed roof panels between ribs
   for (let k = 0; k < 8; k++) {
     const a0 = (k / 8) * Math.PI, a1 = ((k + 1) / 8) * Math.PI;
     const z0 = (span0 + span1) / 2 - Math.cos(a0) * (span1 - span0) / 2, z1 = (span0 + span1) / 2 - Math.cos(a1) * (span1 - span0) / 2;
@@ -297,8 +312,8 @@ function grand(g, L) {
   }
   for (const x of [-L / 2 + 2, -L / 2 + 8, L / 2 - 8, L / 2 - 2]) lampPost(g, x, 1.9, 2.0, iron);
   for (const x of [-5, 5]) bench(g, x, 1.75);
-  for (const x of [-3, 3]) flowerTub(g, x, 1.9);
-  sign(g, -L / 2 + 5, 2.05, 1.9, C(PALETTE.blue), iron);
+  for (const x of [-3, 3]) flowerTub(g, x, 1.9, '#e97ab0');
+  sign(g, -L / 2 + 5, 2.05, 1.9, C(PALETTE.white), iron);
 }
 
 const BUILDERS = { country, village, lakeside, alpine, forest, grand };

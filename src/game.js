@@ -16,8 +16,11 @@ import { PostFX } from './render/post.js';
 import { Sky } from './render/sky.js';
 import { Scenery } from './world/scenery.js';
 import { Towns } from './world/towns.js';
+import { Nature, seasonUniforms, SEASONS } from './world/nature.js';
+import { groundUniforms } from './world/terrain.js';
 import { Life } from './world/life.js';
 import { Effects } from './render/effects.js';
+import { Drifters } from './render/drifters.js';
 import { AudioEngine } from './audio/audio.js';
 import { Passengers } from './stations/passengers.js';
 import { Onboarding } from './ui/onboarding.js';
@@ -43,7 +46,7 @@ export class Game {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(innerWidth, innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.container.appendChild(renderer.domElement);
     this.renderer = renderer;
@@ -52,10 +55,10 @@ export class Game {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#e9e2cc');
-    scene.fog = new THREE.Fog('#e9e2cc', 300, 900);
+    scene.fog = new THREE.Fog('#e9e2cc', 700, 2200);
     this.scene = scene;
 
-    this.camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 3000);
+    this.camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.5, 5000);
 
     this.hemi = new THREE.HemisphereLight('#fff6e0', '#6f8a6a', 1.25);
     scene.add(this.hemi);
@@ -84,19 +87,28 @@ export class Game {
 
     this.say('building villages…');
     await tick();
+    this.nature = new Nature(this.seed);
+    if (this.save?.season !== undefined) this.nature.season = this.save.season;
     this.towns = new Towns(this);
     this.towns.generate();
     scene.add(this.towns.group);
+    this.say('painting the meadows…');
+    await tick();
     this.terrain.recolorAll();
     this.say('planting forests…');
     await tick();
     this.scenery = new Scenery(this);
     this.scenery.generate((x, z) => this.towns.blocks(x, z));
+    this.towns.plantGardens(this.scenery);
+    this.scenery.buildFar();
+    this.towns.buildAll();
     scene.add(this.scenery.group);
     this.life = new Life(this);
     scene.add(this.life.group);
     this.effects = new Effects();
     scene.add(this.effects.mesh);
+    this.drifters = new Drifters();
+    scene.add(this.drifters.mesh);
 
     this.rig = new CameraRig(this.camera, this.terrain);
     this.rig.setImmediate();
@@ -295,6 +307,15 @@ export class Game {
       tod.append(x);
     }
     box.append(tod);
+    box.append(el('h3', '', 'Season'));
+    const sea = el('div', 'row');
+    for (const [id, label] of [['cycle', 'Turning seasons'], ['spring', 'Spring'], ['summer', 'Summer'], ['autumn', 'Autumn'], ['winter', 'Winter']]) {
+      const cur = (this.settings.season || 'cycle') === id;
+      const x = sketchify(el('button', 'chip' + (cur ? ' on' : ''), label), cur ? '#f3dfb0' : '#fbf6e8');
+      x.onclick = () => { this.settings.season = id; this.markDirty(); this.openSettings(); };
+      sea.append(x);
+    }
+    box.append(sea);
     box.append(el('h3', '', 'Sound'));
     const snd = el('div', 'row');
     const tog = (label, on, fn) => {
@@ -316,7 +337,7 @@ export class Game {
     for (const s of this.stations.list) served += s.served;
     let goods = 0;
     for (const s of this.stations.list) goods += s.goods || 0;
-    const txt = `${this.stations.list.length} stations · ${this.trains.list.length} trains · ${served} happy travellers` + (goods ? ` · ${goods} loads` : '');
+    const txt = `${SEASONS[this.nature.seasonIndex]} · ${this.stations.list.length} stations · ${this.trains.list.length} trains · ${served} happy travellers` + (goods ? ` · ${goods} loads` : '');
     if (txt !== this._stats) { this._stats = txt; this.statsEl.textContent = txt; }
   }
 
@@ -570,7 +591,10 @@ export class Game {
   }
 
   frame() {
-    const rdt = Math.min(this.clock.getDelta(), 0.1);
+    // a smoothed frame delta keeps motion even when the browser's timing wobbles
+    const raw = Math.min(this.clock.getDelta(), 0.1);
+    this._sdt = this._sdt ? this._sdt + (raw - this._sdt) * 0.25 : raw;
+    const rdt = Math.abs(raw - this._sdt) > 0.03 ? raw : this._sdt;
     this.adaptQuality(rdt);
     const dt = rdt * this.settings.timeScale;
     this.time += rdt;
@@ -594,11 +618,18 @@ export class Game {
     this.stations.setLabelOpacity(THREE.MathUtils.smoothstep(this.rig.cur.d, 35, 70));
     this.towns.setLabelOpacity(THREE.MathUtils.smoothstep(this.rig.cur.d, 60, 110));
     this.towns.update(dt);
-    this.scenery.update(this.time);
+    this.nature.update(dt, rdt, { seasonMode: this.settings.season || 'cycle', dayMinutes: 24 });
+    const sw = seasonUniforms.uSeasonW.value;
+    groundUniforms.uSpring.value = sw.x;
+    groundUniforms.uAutumn.value = sw.z;
+    groundUniforms.uSnow.value = sw.w;
+    if ((this._lodTick = (this._lodTick || 0) + 1) % 3 === 0) this.terrain.updateLod(this.camera);
+    this.scenery.updateView(this.rig.target, this.rig.cur.d);
     this.life.update(dt, this.time, this.camera);
     this.chimneySmoke(dt);
     this.effects.uniforms.uLight.value = 1 - this.sky.night * 0.55;
-    this.effects.update(rdt);
+    this.effects.update(rdt, this.nature.windVec());
+    this.drifters.update(rdt, this.rig.target, this.rig.cur.d, this.nature.seasonIndex, this.sky.night, this.nature.windVec(), this.terrain);
     this.post.render(this.scene, this.camera);
   }
 }

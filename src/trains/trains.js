@@ -113,6 +113,7 @@ export class TrainSystem {
   }
 
   update(dt) {
+    for (const t of this.list) t._iv = t.pending ? null : t.bodyIntervals();
     for (const t of this.list) {
       if (t.pending) {
         t._spawnTry = (t._spawnTry || 0) - dt;
@@ -129,23 +130,25 @@ export class TrainSystem {
   freeDistance(t, maxLook) {
     let best = { dist: Infinity, blocker: null, opposing: false };
     if (this.list.length < 2) return best;
-    const others = [];
-    for (const o of this.list) {
-      if (o === t || o.pending) continue;
-      if (t.ghost && t.ghost.other === o && t.odo < t.ghost.until) continue;
-      if (o.ghost && o.ghost.other === t && o.odo < o.ghost.until) continue;
-      others.push({ o, iv: o.bodyIntervals() });
-    }
     if (t.ghost && t.odo >= t.ghost.until) t.ghost = null;
     const p = t.plan;
     let acc = 0;
+    const list = this.list;
     const visit = (edge, dir, a, b) => {
-      for (const { o, iv } of others) for (const r of iv) {
+      for (let oi = 0; oi < list.length; oi++) {
+        const o = list[oi];
+        if (o === t || o.pending || !o._iv) continue;
+        if (t.ghost && t.ghost.other === o) continue;
+        if (o.ghost && o.ghost.other === t && o.odo < o.ghost.until) continue;
+        const iv = o._iv;
+        for (let ri = 0; ri < iv.length; ri++) {
+        const r = iv[ri];
         if (r.edge !== edge) continue;
         let d = Infinity;
         if (dir > 0 && r.hi >= a && r.lo <= b) d = acc + Math.max(0, r.lo - a);
         if (dir < 0 && r.lo <= a && r.hi >= b) d = acc + Math.max(0, a - r.hi);
         if (d < best.dist) best = { dist: d, blocker: o, opposing: r.dir !== dir && o.state === 'run' };
+        }
       }
       acc += Math.abs(b - a);
     };

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { clamp, lerp } from './rng.js';
 import { HALF } from '../world/terrain.js';
 
-const MIN_D = 9, MAX_D = 420;
+const MIN_D = 9, MAX_D = 900;
 
 // Map-style camera: a target on the ground, a distance, a heading (yaw) and a
 // tilt that automatically flattens as you zoom in for cinematic close-ups.

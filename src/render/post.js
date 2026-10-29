@@ -103,58 +103,74 @@ const frag = /* glsl */ `
     return col;
   }
 
+  vec3 worldAt(vec2 uv, float d) {
+    vec4 vp = uProjInv * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+    vp /= vp.w;
+    return (uViewInv * vec4(vp.xyz, 1.0)).xyz;
+  }
+  // world-anchored noise: strokes stay put on the surface when the camera moves
+  float wn(vec3 p) { return vnoise(vec2(p.x + p.y * 0.71, p.z - p.y * 0.63)); }
+
+  float edgeAt(vec2 uv, vec2 off, float wc) {
+    float wl = invZ(uv - vec2(off.x, 0.0)), wr = invZ(uv + vec2(off.x, 0.0));
+    float wd = invZ(uv - vec2(0.0, off.y)), wu = invZ(uv + vec2(0.0, off.y));
+    float lap = abs(wl + wr + wd + wu - 4.0 * wc) / wc;
+    float zc = 1.0 / wc;
+    float jump = max(max(abs(1.0 / wl - zc), abs(1.0 / wr - zc)), max(abs(1.0 / wd - zc), abs(1.0 / wu - zc))) / zc;
+    return max(smoothstep(0.02, 0.08, jump), smoothstep(0.012, 0.05, lap) * 0.85);
+  }
+
   void main() {
     vec2 px = uScale / uRes;
-    // hand-drawn wobble: sample edges through a slowly varying offset
-    vec2 wob = (vec2(vnoise(vUv * uRes / (90.0 * uScale)), vnoise(vUv * uRes / (90.0 * uScale) + 17.0)) - 0.5) * px * 1.6;
-    vec2 uv = vUv + wob;
-
     float dC = texture2D(tDepth, vUv).r;
     vec3 col = texture2D(tColor, vUv).rgb;
-
-    if (dC >= 0.99999) {
+    bool sky = dC >= 0.99999;
+    if (sky) {
       vec4 ndc = vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
       vec4 vp = uProjInv * ndc;
       vec3 dir = normalize((uViewInv * vec4(vp.xyz / vp.w, 0.0)).xyz);
       col = skyColor(dir);
     }
-
     float zc = -viewZ(dC);
-    // inverse depth is affine across flat surfaces: its Laplacian finds creases
     float wc = 1.0 / zc;
-    float wl = invZ(uv - vec2(px.x, 0.0)), wr = invZ(uv + vec2(px.x, 0.0));
-    float wd = invZ(uv - vec2(0.0, px.y)), wu = invZ(uv + vec2(0.0, px.y));
-    float lap = abs(wl + wr + wd + wu - 4.0 * wc) / wc;
-    float crease = smoothstep(0.012, 0.05, lap);
-    // silhouettes: big jumps in depth
-    float zl = 1.0 / wl, zr = 1.0 / wr, zd = 1.0 / wd, zu = 1.0 / wu;
-    float jump = max(max(abs(zl - zc), abs(zr - zc)), max(abs(zd - zc), abs(zu - zc))) / zc;
-    float sil = smoothstep(0.02, 0.08, jump);
+    vec3 wp = sky ? vec3(vUv * 400.0, 0.0) : worldAt(vUv, dC);
+
+    // a human hand: wobble, varying pressure and thickness, little gaps
+    float ws = 0.35;
+    vec2 wob = (vec2(wn(wp * ws), wn(wp * ws + 17.3)) - 0.5) * px * 2.4;
+    float thick = 0.65 + 1.1 * wn(wp * 0.13 + 3.1);
+    float pressure = 0.5 + 0.5 * smoothstep(0.15, 0.85, wn(wp * 0.21 + 9.7));
+    float gaps = smoothstep(0.18, 0.42, wn(wp * 1.1 + 4.2));
+    float ink = edgeAt(vUv + wob, px * thick, wc);
+    // a second, lighter sketch stroke drifting off the first
+    vec2 wob2 = (vec2(wn(wp * 0.5 + 41.0), wn(wp * 0.5 + 77.0)) - 0.5) * px * 5.0;
+    float ink2 = edgeAt(vUv + wob2, px * 0.8, wc) * step(0.55, wn(wp * 0.09 + 13.0));
+    ink = max(ink * pressure * gaps, ink2 * 0.4);
 
     // colour edges (windows, trims)
+    vec2 uv = vUv + wob;
     vec3 cl = texture2D(tColor, uv - vec2(px.x, 0.0)).rgb, cr = texture2D(tColor, uv + vec2(px.x, 0.0)).rgb;
     vec3 cd = texture2D(tColor, uv - vec2(0.0, px.y)).rgb, cu = texture2D(tColor, uv + vec2(0.0, px.y)).rgb;
     float ce = length(cl - cr) + length(cd - cu);
     float cedge = smoothstep(0.22, 0.45, ce);
+    ink = max(ink, cedge * 0.5 * pressure);
 
-    float far = smoothstep(260.0, 90.0, zc); // fade lines into the distance
-    float ink = max(sil, crease * 0.85);
-    ink = max(ink, cedge * 0.55);
-    ink *= far;
-    // broken, pencil-like strokes
-    float grain = vnoise(vUv * uRes / (3.0 * uScale));
-    ink *= smoothstep(0.1, 0.55, grain + 0.35);
-    ink = clamp(ink * uInkStrength, 0.0, 0.92);
+    float far = smoothstep(320.0, 100.0, zc);
+    ink = sky ? 0.0 : clamp(ink * far * uInkStrength, 0.0, 0.9);
 
-    // hatching in shade
+    // hatching drawn on the surfaces, strokes of uneven length and angle
     float L = lum(col);
+    float ang = wn(wp * 0.05) * 1.2;
+    vec2 hp = vec2(wp.x + wp.y * 0.6, wp.z - wp.y * 0.4);
+    float h1c = (hp.x * cos(ang) + hp.y * sin(ang)) * 2.3 + wn(wp * 0.8) * 1.2;
+    float h2c = (hp.x * cos(ang + 1.3) - hp.y * sin(ang + 1.3)) * 2.6 + wn(wp * 0.9 + 3.0) * 1.2;
+    float stroke1 = smoothstep(0.32, 0.12, abs(fract(h1c) - 0.5)) * step(0.35, wn(wp * 2.2));
+    float stroke2 = smoothstep(0.32, 0.12, abs(fract(h2c) - 0.5)) * step(0.4, wn(wp * 2.4 + 8.0));
+    float hfade = smoothstep(90.0, 25.0, zc) * (sky ? 0.0 : 1.0);
+    float shade = smoothstep(0.3, 0.12, L);
+    float deep = smoothstep(0.16, 0.05, L);
+    float hatch = (stroke1 * shade * 0.32 + stroke2 * deep * 0.28) * uHatch * hfade;
     vec2 sp = vUv * uRes / uScale;
-    float hn = vnoise(sp * 0.02) * 6.0;
-    float h1 = smoothstep(0.55, 0.0, abs(fract((sp.x + sp.y + hn) / 7.0) - 0.5) * 7.0 - 0.2);
-    float h2 = smoothstep(0.55, 0.0, abs(fract((sp.x - sp.y + hn) / 6.0) - 0.5) * 6.0 - 0.2);
-    float shade = smoothstep(0.3, 0.12, L) * (1.0 - step(0.99999, dC));
-    float deep = smoothstep(0.16, 0.05, L) * (1.0 - step(0.99999, dC));
-    float hatch = (h1 * shade * 0.35 + h2 * deep * 0.3) * uHatch * far;
 
     // paper
     vec3 paper = texture2D(tPaper, sp / 512.0 * 0.9).rgb;

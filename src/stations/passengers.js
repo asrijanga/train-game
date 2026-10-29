@@ -69,11 +69,15 @@ export class Passengers {
         st._acc -= 1;
         if (st.waiting < 60) st.waiting++;
       }
-      const shown = this.people.filter((p) => p.st === st && p.state === 'wait').length;
-      if (shown < Math.min(st.waiting, MAX_VISIBLE) && this.people.length < MAX - 20) this.spawnWaiting(st);
+      st._shown = 0;
     }
-    // walk
-    const keep = [];
+    for (const p of this.people) if (p.state === 'wait' && p.st) p.st._shown = (p.st._shown || 0) + 1;
+    for (const st of this.game.stations.list) {
+      if (st.center && st._shown < Math.min(st.waiting, MAX_VISIBLE) && this.people.length < MAX - 20) this.spawnWaiting(st);
+    }
+    // walk (compacting the list in place)
+    let w = 0;
+    const keep = { push: (p) => { this.people[w++] = p; } };
     for (const p of this.people) {
       if (p.state === 'walk' || p.state === 'board' || p.state === 'leave') {
         if (p.delay > 0) { p.delay -= dt; keep.push(p); continue; }
@@ -90,10 +94,10 @@ export class Passengers {
           p.step = (p.step || 0) + sp;
         }
       }
-      if (p.st && !this.game.stations.list.includes(p.st)) continue;
+      if (p.st && !p.st.view) continue;
       keep.push(p);
     }
-    this.people = keep;
+    this.people.length = w;
     const n = Math.min(MAX, this.people.length);
     for (let i = 0; i < n; i++) {
       const p = this.people[i];

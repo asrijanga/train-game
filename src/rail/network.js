@@ -115,12 +115,14 @@ export class RailEdge {
 
   // Curvature radius around distance d (approx).
   radiusAt(d) {
-    const a = this.sample(Math.max(0, d - 1.5), {}), b = this.sample(Math.min(this.length, d + 1.5), {});
+    const a = this.sample(Math.max(0, d - 1.5), RA), b = this.sample(Math.min(this.length, d + 1.5), RB);
     const cross = a.tx * b.tz - a.tz * b.tx;
     const ang = Math.asin(Math.max(-1, Math.min(1, cross)));
     return Math.abs(ang) < 1e-4 ? Infinity : 3 / Math.abs(ang);
   }
 }
+
+const RA = {}, RB = {};
 
 export class Network {
   constructor() {

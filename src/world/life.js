@@ -25,7 +25,7 @@ export class Life {
   // ---------------------------------------------------------------- clouds
   makeClouds() {
     const rng = this.rng;
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < 28; i++) {
       const mat = new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: toonGradient(), transparent: true, opacity: 0.92, depthWrite: false });
       const grp = new THREE.Group();
       const n = rng.int(5, 9);
@@ -60,7 +60,7 @@ export class Life {
     const sails = ['#f7f1e3', '#e8c8a0', '#c0392b', '#f7f1e3', '#2f5d8a'];
     const hulls = ['#8a5a3b', '#2f5d8a', '#f2ede0', '#2d2c30', '#a8433a'];
     let made = 0;
-    for (let tries = 0; tries < 400 && made < 9; tries++) {
+    for (let tries = 0; tries < 1200 && made < 18; tries++) {
       const x = rng.float(-HALF * 1.1, HALF * 1.1), z = rng.float(-HALF * 1.1, HALF * 1.1);
       if (!this.isDeep(x, z, -2)) continue;
       const k = new Kit();
@@ -110,7 +110,7 @@ export class Life {
   // ---------------------------------------------------------------- birds
   makeBirds() {
     const rng = this.rng;
-    for (let f = 0; f < 6; f++) {
+    for (let f = 0; f < 14; f++) {
       const gull = f < 2;
       const mat = toon(gull ? '#f7f3ea' : '#3a3a42', { side: THREE.DoubleSide });
       const birds = [];
@@ -165,7 +165,7 @@ export class Life {
       return k.build().children[0].geometry;
     })();
     const sheep = [];
-    for (let tries = 0; tries < 300 && this.herds.length < 9; tries++) {
+    for (let tries = 0; tries < 1500 && this.herds.length < 22; tries++) {
       const x = rng.float(-HALF + 30, HALF - 30), z = rng.float(-HALF + 30, HALF - 30);
       const h = t.heightAt(x, z);
       if (h < 1.5 || h > 14 || t.slopeAt(x, z) > 0.3) continue;

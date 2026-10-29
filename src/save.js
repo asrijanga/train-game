@@ -43,6 +43,7 @@ export function serializeGame(game) {
     v: 1,
     seed: game.seed,
     time: game.clockTime ?? 0,
+    season: game.nature?.season,
     terrain: { i: delta(idx), h: hs, d: ds },
     protect: delta(prot),
     net: game.rail.net.serialize(),
