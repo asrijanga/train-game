@@ -3,6 +3,10 @@ import { Terrain } from './world/terrain.js';
 import { createWater } from './world/water.js';
 import { CameraRig } from './core/camera.js';
 import { Input } from './core/input.js';
+import { RailSystem } from './rail/rail.js';
+import { TrackDraft } from './rail/builder.js';
+import { TrackPreview } from './rail/preview.js';
+import { UI } from './ui/ui.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -58,8 +62,23 @@ export class Game {
     this.rig.setImmediate();
     this.rig.apply();
 
+    this.rail = new RailSystem(this);
+    scene.add(this.rail.group);
+    this.preview = new TrackPreview(this.terrain);
+    scene.add(this.preview.group);
+
+    this.ui = new UI(this.uiRoot, this);
+    this.undoStack = [];
+    this.setTool('explore');
+    this.__TrackDraft = TrackDraft;
+
     this.input = new Input(renderer.domElement, this.rig, {
       onTap: (x, y) => this.onTap(x, y),
+      wantsDraw: () => this.tool === 'track',
+      onDrawStart: (x, y) => this.drawStart(x, y),
+      onDrawMove: (x, y) => this.drawMove(x, y),
+      onDrawEnd: () => this.drawEnd(),
+      onDrawCancel: () => this.drawCancel(),
     });
 
     addEventListener('resize', () => this.resize());
@@ -73,9 +92,102 @@ export class Game {
     this.renderer.setSize(innerWidth, innerHeight);
   }
 
+  setTool(id) {
+    this.tool = id;
+    this.drawCancel();
+    this.ui.setTool(id);
+    this.ui.setUndoEnabled(this.undoStack.length > 0);
+  }
+
+  pick(x, y) {
+    return this.terrain.raycast(this.rig.rayAt(x, y));
+  }
+
+  snapRadius() {
+    return THREE.MathUtils.clamp(this.rig.cur.d * 0.03, 1.6, 9);
+  }
+
   onTap(x, y) {
-    const p = this.terrain.raycast(this.rig.rayAt(x, y));
-    if (p) console.log('tap', p.x.toFixed(1), p.y.toFixed(1), p.z.toFixed(1));
+    const p = this.pick(x, y);
+    if (!p) return;
+    if (this.tool === 'remove') {
+      const hit = this.rail.net.nearestEdge(p.x, p.z, this.snapRadius());
+      if (hit) {
+        this.pushUndo();
+        this.rail.removeEdge(hit.edge);
+      }
+    }
+  }
+
+  drawStart(x, y) {
+    const p = this.pick(x, y);
+    if (!p) return;
+    this.draft = new TrackDraft(this.rail, p, this.snapRadius());
+  }
+
+  drawMove(x, y) {
+    if (!this.draft) return;
+    const p = this.pick(x, y);
+    if (!p) return;
+    this.draft.update(p.x, p.z);
+    this.preview.show(this.draft.plan);
+    if (this.draft.plan && !this.draft.plan.valid && this.draft.plan.reason) this.ui.setHint(this.draft.plan.reason);
+  }
+
+  drawEnd() {
+    const plan = this.draft?.plan;
+    this.draft = null;
+    this.preview.hide();
+    this.ui.setTool(this.tool);
+    if (!plan) return;
+    if (!plan.valid) {
+      this.ui.toast(plan.reason || 'That track won\'t fit there');
+      return;
+    }
+    this.pushUndo();
+    this.rail.commit(plan);
+  }
+
+  drawCancel() {
+    this.draft = null;
+    this.preview?.hide();
+  }
+
+  // ---------- undo ----------
+  snapshot() {
+    return {
+      terrain: this.terrain.snapshot(),
+      net: this.rail.net.serialize(),
+      protect: new Uint8Array(this.rail.protect),
+      scenery: this.scenery?.snapshot?.(),
+      stations: this.stations?.serialize?.(),
+      trains: this.trains?.serialize?.(),
+    };
+  }
+
+  pushUndo() {
+    this.undoStack.push(this.snapshot());
+    if (this.undoStack.length > 25) this.undoStack.shift();
+    this.ui.setUndoEnabled(true);
+  }
+
+  undo() {
+    const s = this.undoStack.pop();
+    if (!s) return;
+    this.restore(s);
+    this.ui.setUndoEnabled(this.undoStack.length > 0);
+  }
+
+  restore(s) {
+    this.trains?.clear?.();
+    this.stations?.clear?.();
+    this.rail.clear();
+    this.terrain.restore(s.terrain);
+    this.rail.protect.set(s.protect);
+    if (s.scenery) this.scenery?.restore?.(s.scenery);
+    this.rail.net.load(s.net);
+    if (s.stations) this.stations?.load?.(s.stations);
+    if (s.trains) this.trains?.load?.(s.trains);
   }
 
   updateSunShadow() {
@@ -98,6 +210,7 @@ export class Game {
     this.rig.update(dt);
     this.updateSunShadow();
     this.water.uniforms.uTime.value = this.time;
+    this.preview.update(this.time);
     this.renderer.render(this.scene, this.camera);
   }
 }
