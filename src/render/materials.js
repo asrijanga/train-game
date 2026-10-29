@@ -20,9 +20,8 @@ export function toon(color, opts = {}) {
   const key = `${color}|${opts.vertexColors ? 1 : 0}|${opts.emissive ?? ''}|${opts.side ?? ''}|${opts.transparent ? opts.opacity : ''}|${opts.flat ? 1 : 0}`;
   let m = cache.get(key);
   if (m) return m;
-  m = new THREE.MeshToonMaterial({
+  m = new THREE.MeshLambertMaterial({
     color: new THREE.Color(color),
-    gradientMap: toonGradient(),
     vertexColors: !!opts.vertexColors,
     side: opts.side ?? THREE.FrontSide,
   });

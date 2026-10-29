@@ -237,7 +237,7 @@ export class StationSystem {
     }
     // name boards
     for (const sg of g.signs) {
-      const { tex } = labelTexture(st.name, { banner: false, font: '700 64px Caveat, cursive', color: '#2b2a33', height: 96 });
+      const { tex } = labelTexture(st.name, { banner: false, font: '600 51px -apple-system, BlinkMacSystemFont, "SF Pro Rounded", sans-serif', color: '#2b2a33', height: 96 });
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
       for (const face of [-1, 1]) {
         const plane = new THREE.Mesh(new THREE.PlaneGeometry(sg.w, sg.h), mat);

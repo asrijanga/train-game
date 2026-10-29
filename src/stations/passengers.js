@@ -196,7 +196,7 @@ export class Passengers {
   }
 
   pop(st, text, color = '#2f6b4f') {
-    const { tex, w, h } = labelTexture(text, { banner: false, font: '700 64px Caveat, cursive', color });
+    const { tex, w, h } = labelTexture(text, { banner: false, font: '600 51px -apple-system, BlinkMacSystemFont, "SF Pro Rounded", sans-serif', color });
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
     sp.scale.set((0.04 * w) / h, 0.04, 1);
     sp.position.copy(st.center).add(new THREE.Vector3(0, 4, 0));

@@ -28,7 +28,7 @@ export class Life {
     // big Ghibli cumulus: flat sunlit bases, billowing towers
     const rng = this.rng;
     for (let i = 0; i < 26; i++) {
-      const mat = new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: toonGradient(), transparent: true, opacity: 0.95, depthWrite: false });
+      const mat = new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.95, depthWrite: false });
       const grp = new THREE.Group();
       const tower = rng.chance(0.35);
       const n = rng.int(7, 12);

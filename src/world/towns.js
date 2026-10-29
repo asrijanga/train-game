@@ -352,7 +352,7 @@ export class Towns {
     if (glass.n) grp.add(new THREE.Mesh(glass.build(), windowMat));
     if (lamps.n) grp.add(new THREE.Mesh(lamps.build(), lampMat));
     if (town.lanterns.length) grp.add(glowPoints(town.lanterns));
-    const lbl = labelTexture(town.name, { font: 'italic 700 60px Caveat, cursive', bg: 'rgba(240,232,210,0.85)' });
+    const lbl = labelTexture(town.name, { font: '600 48px -apple-system, BlinkMacSystemFont, "SF Pro Rounded", sans-serif', bg: 'rgba(255, 244, 226, 0.8)' });
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: lbl.tex, transparent: true, depthTest: false, sizeAttenuation: false }));
     sp.scale.set((0.038 * lbl.w) / lbl.h, 0.038, 1);
     sp.position.set(town.x, this.terrain.heightAt(town.x, town.z) + 14, town.z);

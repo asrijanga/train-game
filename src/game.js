@@ -69,6 +69,7 @@ export class Game {
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.0008;
     sun.shadow.normalBias = 0.4;
+    sun.shadow.radius = 3;
     const sc = sun.shadow.camera;
     sc.left = -120; sc.right = 120; sc.top = 120; sc.bottom = -120; sc.near = 1; sc.far = 700;
     scene.add(sun, sun.target);
@@ -605,6 +606,10 @@ export class Game {
     this.onboarding?.update();
     this.audio.update(rdt);
     this.updateSunShadow();
+    // atmospheric haze scales with the view, like looking across a real valley
+    const fd = this.rig.cur.d;
+    this.scene.fog.near = 40 + fd * 0.9;
+    this.scene.fog.far = 260 + fd * 4.2;
     this.water.uniforms.uTime.value = this.time;
     this.preview.update(this.time);
     this.trains.update(dt);
