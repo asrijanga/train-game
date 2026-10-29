@@ -6,7 +6,9 @@ import { Input } from './core/input.js';
 import { RailSystem } from './rail/rail.js';
 import { TrackDraft } from './rail/builder.js';
 import { TrackPreview } from './rail/preview.js';
-import { UI } from './ui/ui.js';
+import { UI, el, sketchify } from './ui/ui.js';
+import { StationSystem } from './stations/stations.js';
+import { STYLES } from './stations/styles.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -62,8 +64,14 @@ export class Game {
     this.rig.setImmediate();
     this.rig.apply();
 
+    try {
+      await Promise.all([document.fonts.load('700 56px Caveat'), document.fonts.load('20px "Patrick Hand"')]);
+    } catch { /* fonts are a nicety */ }
+
     this.rail = new RailSystem(this);
     scene.add(this.rail.group);
+    this.stations = new StationSystem(this);
+    scene.add(this.stations.group);
     this.preview = new TrackPreview(this.terrain);
     scene.add(this.preview.group);
 
@@ -107,16 +115,80 @@ export class Game {
     return THREE.MathUtils.clamp(this.rig.cur.d * 0.03, 1.6, 9);
   }
 
+  onNetworkChanged(ev) {
+    this.stations?.onNetEvent(ev);
+    this.trains?.onNetEvent?.(ev);
+  }
+
+  stationAt(p) {
+    let best = null, bd = Infinity;
+    for (const st of this.stations.list) {
+      const d = st.center.distanceTo(p);
+      if (d < st.length / 2 + 4 && d < bd) { bd = d; best = st; }
+    }
+    return best;
+  }
+
   onTap(x, y) {
     const p = this.pick(x, y);
     if (!p) return;
+    const r = this.snapRadius();
     if (this.tool === 'remove') {
-      const hit = this.rail.net.nearestEdge(p.x, p.z, this.snapRadius());
+      const tr = this.trains?.trainAt?.(p, r);
+      if (tr) { this.pushUndo(); this.trains.remove(tr); return; }
+      const st = this.stationAt(p);
+      if (st && st.center.distanceTo(p) < st.length / 2 + 2) { this.pushUndo(); this.stations.remove(st); return; }
+      const hit = this.rail.net.nearestEdge(p.x, p.z, r);
       if (hit) {
         this.pushUndo();
         this.rail.removeEdge(hit.edge);
       }
+      return;
     }
+    if (this.tool === 'station') {
+      const st = this.stationAt(p);
+      if (st) { this.openStation(st); return; }
+      const hit = this.rail.net.nearestEdge(p.x, p.z, r * 1.5);
+      if (!hit) { this.ui.toast('Tap right next to a piece of track'); return; }
+      const s = hit.edge.sample(hit.d, {});
+      const side = (p.x - s.x) * -s.tz + (p.z - s.z) * s.tx >= 0 ? 1 : -1;
+      const snap = this.snapshot();
+      const res = this.stations.place(hit.edge, hit.d, side);
+      if (!res.ok) { this.ui.toast(res.reason); return; }
+      this.undoStack.push(snap);
+      this.ui.setUndoEnabled(true);
+      this.openStation(res.station);
+      return;
+    }
+    if (this.tool === 'train' && this.trains?.onTap?.(p)) return;
+    if (this.tool === 'explore') {
+      const tr = this.trains?.trainAt?.(p, r);
+      if (tr) { this.trains.select(tr); return; }
+      const st = this.stationAt(p);
+      if (st) { this.openStation(st); return; }
+      this.ui.showPanel(null);
+      this.trains?.select?.(null);
+    }
+  }
+
+  openStation(st) {
+    const box = el('div');
+    const h = el('h2', '', st.name);
+    const style = el('p', '', `<i>${STYLES[st.style].label}</i>`);
+    box.append(h, style);
+    const stats = el('p', '', `Passengers welcomed: <b>${st.served}</b>`);
+    box.append(stats);
+    const row = el('div', 'row');
+    const btn = (label, fn) => { const b = sketchify(el('button', 'btn', label)); b.onclick = fn; row.append(b); return b; };
+    btn('Change style', () => { this.pushUndo(); this.stations.cycleStyle(st); this.openStation(st); });
+    btn('Rename', () => {
+      const n = prompt('Name this station', st.name);
+      if (n && n.trim()) { st.name = n.trim().slice(0, 40); this.stations.buildView(st); this.openStation(st); }
+    });
+    btn('Visit', () => this.rig.flyTo(st.center.x, st.center.z, 30));
+    btn('Remove', () => { this.pushUndo(); this.stations.remove(st); this.ui.showPanel(null); });
+    box.append(row);
+    this.ui.showPanel(box);
   }
 
   drawStart(x, y) {
@@ -211,6 +283,8 @@ export class Game {
     this.updateSunShadow();
     this.water.uniforms.uTime.value = this.time;
     this.preview.update(this.time);
+    this.stations.update(dt, (this.time / 60 + 9) % 12);
+    this.stations.setLabelOpacity(THREE.MathUtils.smoothstep(this.rig.cur.d, 35, 70));
     this.renderer.render(this.scene, this.camera);
   }
 }
