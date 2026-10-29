@@ -455,6 +455,7 @@ export class Train {
       trail: this.trail.map((s) => ({ edge: s.edge.id, dir: s.dir, from: s.from, to: s.to })),
       state: this.state === 'run' ? 'dwell' : this.state, timer: 1,
       passengers: this.passengers,
+      loaded: this.vehicles.map((v) => (v.loaded ? 1 : 0)),
     };
   }
 }

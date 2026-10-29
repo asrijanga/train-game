@@ -235,17 +235,18 @@ function logWagon() {
   k.box(L, 0.14, 0.86, '#5e4632', 0, 0.48, 0);
   k.box(L, 0.08, 0.5, '#2f2e33', 0, 0.38, 0);
   for (const x of [-1.5, -0.5, 0.5, 1.5]) for (const z of [-0.42, 0.42]) k.box(0.06, 0.62, 0.06, '#3a2a1e', x, 0.84, z);
+  const ck = new Kit();
   const logs = ['#8a5a3b', '#7a4f30', '#9a6a42'];
   let i = 0;
   for (const [y, zs] of [[0.7, [-0.27, 0, 0.27]], [0.93, [-0.14, 0.14]], [1.14, [0]]]) {
     for (const z of zs) {
-      k.cyl(0.13, L - 0.15, logs[i++ % 3], 0, y, z, 'x', 8);
-      k.cyl(0.11, 0.01, '#e2c79a', L / 2 - 0.07, y, z, 'x', 8);
-      k.cyl(0.11, 0.01, '#e2c79a', -L / 2 + 0.07, y, z, 'x', 8);
+      ck.cyl(0.13, L - 0.15, logs[i++ % 3], 0, y, z, 'x', 8);
+      ck.cyl(0.11, 0.01, '#e2c79a', L / 2 - 0.07, y, z, 'x', 8);
+      ck.cyl(0.11, 0.01, '#e2c79a', -L / 2 + 0.07, y, z, 'x', 8);
     }
   }
-  k.box(0.04, 0.04, 0.9, '#55545a', 0.6, 1.2, 0);
-  k.box(0.04, 0.04, 0.9, '#55545a', -0.6, 1.2, 0);
+  ck.box(0.04, 0.04, 0.9, '#55545a', 0.6, 1.2, 0);
+  ck.box(0.04, 0.04, 0.9, '#55545a', -0.6, 1.2, 0);
   buffers(k, L / 2, 1, '#2f2e33');
   buffers(k, -L / 2, -1, '#2f2e33');
   const grp = k.build();
@@ -526,16 +527,21 @@ function hopper() {
   k.box(L, 0.7, 0.92, col, 0, 1.0, 0);
   for (const x of [-0.8, 0.8]) k.add(new THREE.ConeGeometry(0.5, 0.5, 4), col, x, 0.52, 0, Math.PI, Math.PI / 4, 0, 1.2, 1, 1.2);
   for (let x = -L / 2 + 0.3; x < L / 2; x += 0.55) for (const z of [-0.465, 0.465]) k.box(0.05, 0.7, 0.02, '#3a3d44', x, 1.0, z);
-  for (let i = 0; i < 14; i++) k.box(0.4, 0.2, 0.35, i % 2 ? '#1d1c22' : '#26252b', -1.4 + (i % 7) * 0.47, 1.38 + (i % 3) * 0.04, -0.2 + Math.floor(i / 7) * 0.4, i, i * 0.7, 0.2);
+  const ck = new Kit();
+  for (let i = 0; i < 14; i++) ck.box(0.4, 0.2, 0.35, i % 2 ? '#1d1c22' : '#26252b', -1.4 + (i % 7) * 0.47, 1.38 + (i % 3) * 0.04, -0.2 + Math.floor(i / 7) * 0.4, i, i * 0.7, 0.2);
+  k.box(L - 0.1, 0.02, 0.86, '#2a2a30', 0, 1.3, 0);
   buffers(k, L / 2, 1, '#2f2e33');
   buffers(k, -L / 2, -1, '#2f2e33');
   const grp = k.build();
+  const cargoMesh = ck.build();
+  cargoMesh.visible = false;
+  grp.add(cargoMesh);
   const bg = new Kit();
   bogie(bg, wheels, -1.0);
   bogie(bg, wheels, 1.0);
   grp.add(bg.build());
   for (const w of wheels) grp.add(w.mesh);
-  return { group: grp, wheels };
+  return { group: grp, wheels, cargoMesh };
 }
 
 function tankCar() {

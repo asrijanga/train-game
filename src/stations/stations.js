@@ -331,7 +331,7 @@ export class StationSystem {
   }
 
   serialize() {
-    return this.list.map((s) => ({ id: s.id, name: s.name, edge: s.edge.id, d: s.d, side: s.side, length: s.length, style: s.style, served: s.served }));
+    return this.list.map((s) => ({ id: s.id, name: s.name, edge: s.edge.id, d: s.d, side: s.side, length: s.length, style: s.style, served: s.served, waiting: s.waiting || 0, goods: s.goods || 0 }));
   }
 
   load(data) {

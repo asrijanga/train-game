@@ -225,8 +225,9 @@ export class TrainSystem {
         const busy = t.speed > 0.2;
         if (busy && v._chuff > per) {
           v._chuff = 0;
+          v._n = (v._n || 0) + 1;
           const k = Math.min(1, t.speed / 5);
-          fx.spawn(p.x, p.y, p.z, (Math.random() - 0.5) * 0.4, 2.2 + k * 1.2, (Math.random() - 0.5) * 0.4, 0.45 + k * 0.25, 2.6 + Math.random(), 2.2, 0.15);
+          if (v._n % 2 === 0 || t.speed < 2) fx.spawn(p.x, p.y, p.z, (Math.random() - 0.5) * 0.5, 2.6 + k * 1.4, (Math.random() - 0.5) * 0.5, 0.26 + k * 0.12 + Math.random() * 0.08, 1.6 + Math.random() * 0.7, 2.8, 0.12);
           this.game.audio?.chuff?.(t, k);
         } else if (!busy) {
           v._idle = (v._idle ?? 0) - dt;
@@ -426,6 +427,7 @@ export class TrainSystem {
       t.state = 'dwell';
       t.timer = d.timer ?? 1;
       t.passengers = d.passengers || 0;
+      (d.loaded || []).forEach((l, i) => { const v = t.vehicles[i]; if (v) { v.loaded = !!l; if (v.cargoMesh) v.cargoMesh.visible = !!l; } });
       t.place();
       this.list.push(t);
       this.group.add(t.group);

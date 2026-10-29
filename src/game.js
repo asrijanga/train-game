@@ -19,6 +19,7 @@ import { Towns } from './world/towns.js';
 import { Life } from './world/life.js';
 import { Effects } from './render/effects.js';
 import { AudioEngine } from './audio/audio.js';
+import { Passengers } from './stations/passengers.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -110,6 +111,8 @@ export class Game {
     scene.add(this.stations.group);
     this.trains = new TrainSystem(this);
     scene.add(this.trains.group);
+    this.passengers = new Passengers(this);
+    scene.add(this.passengers.group);
     this.preview = new TrackPreview(this.terrain);
     scene.add(this.preview.group);
 
@@ -239,7 +242,9 @@ export class Game {
     if (!this.statsEl) return;
     let served = 0;
     for (const s of this.stations.list) served += s.served;
-    const txt = `${this.stations.list.length} stations · ${this.trains.list.length} trains · ${served} happy travellers`;
+    let goods = 0;
+    for (const s of this.stations.list) goods += s.goods || 0;
+    const txt = `${this.stations.list.length} stations · ${this.trains.list.length} trains · ${served} happy travellers` + (goods ? ` · ${goods} loads` : '');
     if (txt !== this._stats) { this._stats = txt; this.statsEl.textContent = txt; }
   }
 
@@ -342,7 +347,7 @@ export class Game {
     const h = el('h2', '', st.name);
     const style = el('p', '', `<i>${STYLES[st.style].label}</i>`);
     box.append(h, style);
-    const stats = el('p', '', `Passengers welcomed: <b>${st.served}</b>`);
+    const stats = el('p', '', `Passengers welcomed: <b>${st.served}</b> · waiting: <b>${st.waiting || 0}</b>` + (st.goods ? ` · loads: <b>${st.goods}</b>` : ''));
     box.append(stats);
     const row = el('div', 'row');
     const btn = (label, fn) => { const b = sketchify(el('button', 'btn', label)); b.onclick = fn; row.append(b); return b; };
@@ -430,6 +435,7 @@ export class Game {
   }
 
   restore(s) {
+    this.passengers?.clear();
     this.trains?.clear?.();
     this.stations?.clear?.();
     this.rail.clear();
@@ -480,6 +486,7 @@ export class Game {
     this.water.uniforms.uTime.value = this.time;
     this.preview.update(this.time);
     this.trains.update(dt);
+    this.passengers.update(dt, this.time);
     const cyc = this.settings.dayCycle;
     if (cyc === 'cycle') this.sky.advance(dt, 24);
     else this.sky.hour = { day: 11, golden: 17.9, night: 22.5 }[cyc] ?? 11;

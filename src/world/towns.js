@@ -250,6 +250,49 @@ export class Towns {
     }
   }
 
+  // A station near this town delivered n happy travellers: the town grows.
+  served(pos, n) {
+    const town = this.nearest(pos.x, pos.z, 70);
+    if (!town) return;
+    town.growth = (town.growth || 0) + n;
+    if (town.growth >= 14 && (town.extra || 0) < 16) {
+      town.growth = 0;
+      if (this.grow(town)) this.game.audio?.pop(1.8);
+    }
+  }
+
+  grow(town) {
+    const rng = this.growRng || (this.growRng = new Rng(this.terrain.seed * 91 + 5));
+    const net = this.game.rail.net;
+    const streets = this.streets.filter((s) => Math.hypot((s.x0 + s.x1) / 2 - town.x, (s.z0 + s.z1) / 2 - town.z) < 30);
+    for (let tries = 0; tries < 40; tries++) {
+      const s = rng.pick(streets.length ? streets : this.streets);
+      const L = Math.hypot(s.x1 - s.x0, s.z1 - s.z0);
+      const ux = (s.x1 - s.x0) / L, uz = (s.z1 - s.z0) / L;
+      const d = rng.float(-10, L + 10), side = rng.chance(0.5) ? 1 : -1;
+      const off = 3.1 + rng.float(0, 0.6) + (d < 0 || d > L ? 0 : rng.chance(0.4) ? 4.5 : 0);
+      const hx = s.x0 + ux * d - uz * side * off, hz = s.z0 + uz * d + ux * side * off;
+      const g = this.terrain.heightAt(hx, hz);
+      if (g < 0.8 || this.terrain.slopeAt(hx, hz) > 0.35) continue;
+      if (town.houses.some((h) => !h.hidden && Math.hypot(h.x - hx, h.z - hz) < 3.0)) continue;
+      if (net.nearestEdge(hx, hz, 4.5)) continue;
+      if (this.game.stations.list.some((st) => st.center && st.center.distanceTo(new THREE.Vector3(hx, st.center.y, hz)) < st.length / 2 + 6)) continue;
+      const h = {
+        id: town.houses.length, x: hx, z: hz, rot: Math.atan2(uz * side, -ux * side),
+        w: rng.float(2.0, 2.8), d: rng.float(1.7, 2.3), h: rng.chance(0.3) ? rng.float(2.3, 2.7) : rng.float(1.3, 1.7),
+        wall: rng.pick(WALLS), roof: rng.pick(ROOFS), door: rng.pick(DOORS), chimney: rng.chance(0.7), timber: rng.chance(0.2),
+        fence: rng.chance(0.3), hidden: false, grown: true,
+      };
+      town.houses.push(h);
+      town.extra = (town.extra || 0) + 1;
+      this.game.scenery?.clearAlong(new Float32Array([hx, g, hz]), 2.2);
+      this.buildTown(town);
+      this.game.effects?.puff(new THREE.Vector3(hx, g, hz), 1.5, 14);
+      return true;
+    }
+    return false;
+  }
+
   nearest(x, z, r) {
     let best = null, bd = r;
     for (const t of this.list) {
@@ -263,6 +306,8 @@ export class Towns {
     return this.list.map((t) => ({
       h: t.houses.filter((h) => h.hidden).map((h) => h.id),
       c: !!t.church?.hidden, m: !!t.mill?.hidden,
+      g: t.houses.filter((h) => h.grown).map((h) => ({ ...h })),
+      gr: t.growth || 0,
     }));
   }
 
@@ -270,6 +315,10 @@ export class Towns {
     this.list.forEach((t, i) => {
       const d = s[i];
       if (!d) return;
+      t.houses = t.houses.filter((h) => !h.grown);
+      for (const h of d.g || []) t.houses.push({ ...h });
+      t.extra = (d.g || []).length;
+      t.growth = d.gr || 0;
       const hid = new Set(d.h);
       for (const h of t.houses) h.hidden = hid.has(h.id);
       if (t.church) t.church.hidden = d.c;

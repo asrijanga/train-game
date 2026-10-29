@@ -51,7 +51,7 @@ export class Effects {
           float swirl = smoothstep(0.02, 0.0, abs(length(p - vec2(0.06, 0.05)) - r * 0.45)) * step(0.0, sin(a * 1.0 + seed)) * 0.6;
           vec3 base = mix(vec3(0.97, 0.96, 0.93), vec3(0.62, 0.6, 0.6), vP.w);
           vec3 shade = base * (0.82 + 0.18 * smoothstep(0.3, -0.3, p.y - p.x * 0.3));
-          vec3 col = mix(shade, uInk, max(rim * 0.85, swirl * 0.5));
+          vec3 col = mix(shade, uInk, max(rim * 0.6, swirl * 0.35));
           float alpha = max(body, rim) * vP.y;
           gl_FragColor = vec4(col * uLight, alpha);
           #include <colorspace_fragment>
@@ -99,7 +99,7 @@ export class Effects {
       const t = q.age / q.life;
       this.offset[i * 3] = q.x; this.offset[i * 3 + 1] = q.y; this.offset[i * 3 + 2] = q.z;
       this.params[i * 4] = q.s0 * (1 + t * q.grow);
-      this.params[i * 4 + 1] = Math.min(1, q.age * 6) * (1 - t * t);
+      this.params[i * 4 + 1] = Math.min(1, q.age * 6) * (1 - t * t) * 0.9;
       this.params[i * 4 + 2] = q.seed;
       this.params[i * 4 + 3] = q.shade;
     }
