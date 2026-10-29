@@ -85,6 +85,7 @@ export class Train {
     this.state = 'dwell';
     this.timer = 3;
     this.atStation = st;
+    this.status = `Boarding at ${st.name}`;
     this.place();
   }
 

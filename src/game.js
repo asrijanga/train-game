@@ -18,6 +18,7 @@ import { Scenery } from './world/scenery.js';
 import { Towns } from './world/towns.js';
 import { Life } from './world/life.js';
 import { Effects } from './render/effects.js';
+import { AudioEngine } from './audio/audio.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -45,6 +46,7 @@ export class Game {
     this.container.appendChild(renderer.domElement);
     this.renderer = renderer;
     this.post = new PostFX(renderer);
+    this.audio = new AudioEngine(this);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#e9e2cc');
@@ -218,6 +220,16 @@ export class Game {
       tod.append(x);
     }
     box.append(tod);
+    box.append(el('h3', '', 'Sound'));
+    const snd = el('div', 'row');
+    const tog = (label, on, fn) => {
+      const x = sketchify(el('button', 'chip' + (on ? ' on' : ''), `${label}: ${on ? 'on' : 'off'}`), on ? '#f3dfb0' : '#fbf6e8');
+      x.onclick = () => { fn(!on); this.markDirty(); this.openSettings(); };
+      snd.append(x);
+    };
+    tog('Sounds', this.audio.enabled, (v) => this.audio.setEnabled(v));
+    tog('Music', this.audio.musicOn, (v) => this.audio.setMusic(v));
+    box.append(snd);
     this.settingsExtra?.(box);
     box.append(el('p', 'blurb', '<i>Your railway saves itself every few moments.</i>'));
     this.ui.showPanel(box);
@@ -240,6 +252,7 @@ export class Game {
 
   setTool(id) {
     const prev = this.tool;
+    if (prev && prev !== id) this.audio?.pop(0.8);
     this.tool = id;
     this.drawCancel();
     this.ui.setTool(id);
@@ -255,6 +268,15 @@ export class Game {
 
   snapRadius() {
     return THREE.MathUtils.clamp(this.rig.cur.d * 0.03, 1.6, 9);
+  }
+
+  onTrainDepart(t) {
+    this.audio.whistle(t);
+  }
+
+  onTrainArrive(t, st) {
+    if (st) this.audio.stationBell(st);
+    this.passengers?.onArrive(t, st);
   }
 
   onNetworkChanged(ev) {
@@ -299,6 +321,7 @@ export class Game {
       if (!res.ok) { this.ui.toast(res.reason); return; }
       this.undoStack.push(snap);
       this.markDirty();
+      this.audio.pop(1.2);
       this.ui.setUndoEnabled(true);
       this.openStation(res.station);
       return;
@@ -342,6 +365,12 @@ export class Game {
 
   drawMove(x, y) {
     if (!this.draft) return;
+    const now = performance.now();
+    if (this._lastDraw) {
+      const sp = Math.hypot(x - this._lastDraw.x, y - this._lastDraw.y) / Math.max(1, now - this._lastDraw.t);
+      this.audio.scratch(Math.min(1, sp * 0.6));
+    }
+    this._lastDraw = { x, y, t: now };
     const p = this.pick(x, y);
     if (!p) return;
     this.draft.update(p.x, p.z);
@@ -352,6 +381,8 @@ export class Game {
   drawEnd() {
     const plan = this.draft?.plan;
     this.draft = null;
+    this._lastDraw = null;
+    this.audio.scratch(0);
     this.preview.hide();
     this.ui.setTool(this.tool);
     if (!plan) return;
@@ -361,10 +392,13 @@ export class Game {
     }
     this.pushUndo();
     this.rail.commit(plan);
+    this.audio.thunk();
   }
 
   drawCancel() {
     this.draft = null;
+    this._lastDraw = null;
+    this.audio?.scratch(0);
     this.preview?.hide();
   }
 
@@ -441,6 +475,7 @@ export class Game {
     this.time += rdt;
     this.rig.update(rdt);
     this.updateStats();
+    this.audio.update(rdt);
     this.updateSunShadow();
     this.water.uniforms.uTime.value = this.time;
     this.preview.update(this.time);

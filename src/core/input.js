@@ -146,7 +146,7 @@ export class Input {
     const dur = performance.now() - p.t;
     const moved = Math.hypot(p.x - p.sx, p.y - p.sy);
     if (this.pointers.size === 0) {
-      if (!cancelled && (this.state === 'pendingPan' || this.state === 'pendingDraw') && dur < 450 && moved < 12) {
+      if (!cancelled && (this.state === 'pendingPan' || this.state === 'pendingDraw') && dur < 700 && moved < 14) {
         this.h.onTap?.(p.x, p.y);
       } else if (this.state === 'drawing') {
         if (cancelled) this.h.onDrawCancel?.();

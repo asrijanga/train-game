@@ -366,6 +366,7 @@ export class TrainSystem {
     t.state = 'dwell';
     t.timer = 2.5;
     this.game.ui.setTool('train');
+    this.game.audio?.pop(1.5);
     this.select(t);
     this.followTrain(t);
   }
