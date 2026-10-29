@@ -90,3 +90,25 @@ export const tailGlowMat = new THREE.SpriteMaterial({
   depthWrite: false,
   blending: THREE.AdditiveBlending,
 });
+
+// Many lantern glows in one draw call.
+export const glowPointsMat = new THREE.PointsMaterial({
+  map: glowTexture(),
+  size: 2.2,
+  sizeAttenuation: true,
+  transparent: true,
+  opacity: 0,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  color: 0xffffff,
+});
+
+export function glowPoints(positions, size = 2.2) {
+  const g = new THREE.BufferGeometry();
+  const arr = new Float32Array(positions.length * 3);
+  positions.forEach((p, i) => { arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z; });
+  g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+  const pts = new THREE.Points(g, glowPointsMat);
+  pts.frustumCulled = false;
+  return pts;
+}

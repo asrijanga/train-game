@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Kit } from '../trains/kit.js';
 import { toon, toonGradient } from '../render/materials.js';
 import { Rng } from '../core/rng.js';
@@ -46,6 +47,13 @@ export class Life {
       base.scale.set(W * 1.1, W * 0.18, W * 0.55);
       base.castShadow = true;
       grp.add(base);
+      // merge the puffs into a single mesh: one draw call per cloud
+      const geos = grp.children.map((c) => { c.updateMatrix(); return CLOUD_GEO.clone().applyMatrix4(c.matrix); });
+      const merged = new THREE.Mesh(mergeGeometries(geos, false), mat);
+      geos.forEach((g) => g.dispose());
+      merged.castShadow = true;
+      grp.clear();
+      grp.add(merged);
       grp.position.set(rng.float(-HALF, HALF), rng.float(85, 120), rng.float(-HALF, HALF));
       this.group.add(grp);
       this.clouds.push({ grp, mat, speed: rng.float(1.5, 3) });
@@ -118,25 +126,33 @@ export class Life {
 
   // ---------------------------------------------------------------- birds
   makeBirds() {
+    // all birds share three instanced meshes (body, left wing, right wing)
     const rng = this.rng;
+    const birds = [];
     for (let f = 0; f < 14; f++) {
       const gull = f < 2;
-      const mat = toon(gull ? '#f7f3ea' : '#3a3a42', { side: THREE.DoubleSide });
-      const birds = [];
       const n = rng.int(5, 9);
-      const fl = { cx: rng.float(-HALF * 0.8, HALF * 0.8), cz: rng.float(-HALF * 0.8, HALF * 0.8), r: rng.float(18, 40), y: rng.float(18, 34), w: rng.float(0.1, 0.2) * (rng.chance(0.5) ? 1 : -1), a: rng.float(0, 6.28), birds, drift: [rng.float(-1, 1), rng.float(-1, 1)] };
+      const fl = { cx: rng.float(-HALF * 0.8, HALF * 0.8), cz: rng.float(-HALF * 0.8, HALF * 0.8), r: rng.float(18, 40), y: rng.float(18, 34), w: rng.float(0.1, 0.2) * (rng.chance(0.5) ? 1 : -1), a: rng.float(0, 6.28), birds: [], drift: [rng.float(-1, 1), rng.float(-1, 1)] };
       for (let i = 0; i < n; i++) {
-        const b = new THREE.Group();
-        const body = new THREE.Mesh(BIRD_BODY, mat);
-        const l = new THREE.Mesh(WING, mat), r = new THREE.Mesh(WING, mat);
-        r.scale.z = -1;
-        b.add(body, l, r);
-        b.scale.setScalar(gull ? 0.9 : 0.6);
-        this.group.add(b);
-        birds.push({ obj: b, l, r, off: [rng.float(-4, 4), rng.float(-1.5, 1.5), rng.float(-4, 4)], ph: rng.float(0, 6) });
+        const b = { i: birds.length, s: gull ? 0.9 : 0.6, gull, off: [rng.float(-4, 4), rng.float(-1.5, 1.5), rng.float(-4, 4)], ph: rng.float(0, 6) };
+        fl.birds.push(b);
+        birds.push(b);
       }
       this.flocks.push(fl);
     }
+    const mat = toon('#ffffff', { side: THREE.DoubleSide });
+    const mk = (geo) => {
+      const m = new THREE.InstancedMesh(geo, mat, birds.length);
+      m.frustumCulled = false;
+      const c = new THREE.Color();
+      for (const b of birds) m.setColorAt(b.i, c.set(b.gull ? '#f7f3ea' : '#3a3a42'));
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      this.group.add(m);
+      return m;
+    };
+    this.birdBody = mk(BIRD_BODY);
+    this.birdL = mk(WING);
+    this.birdR = mk(WING);
   }
 
   updateBirds(dt, t) {
@@ -151,13 +167,22 @@ export class Life {
       for (const b of fl.birds) {
         const ox = b.off[0] * Math.cos(heading) - b.off[2] * Math.sin(heading);
         const oz = b.off[0] * Math.sin(heading) + b.off[2] * Math.cos(heading);
-        b.obj.position.set(hx + ox, fl.y + b.off[1] + Math.sin(t * 0.7 + b.ph) * 0.5, hz + oz);
-        b.obj.rotation.y = -heading;
+        V.set(hx + ox, fl.y + b.off[1] + Math.sin(t * 0.7 + b.ph) * 0.5, hz + oz);
         const flap = Math.sin(t * 7 + b.ph) * 0.6 * (0.5 + 0.5 * Math.sin(t * 0.4 + b.ph));
-        b.l.rotation.x = flap;
-        b.r.rotation.x = -flap;
+        BE.set(0, -heading, 0, 'YXZ');
+        M.compose(V, Q.setFromEuler(BE), S.set(b.s, b.s, b.s));
+        this.birdBody.setMatrixAt(b.i, M);
+        BE.set(flap, -heading, 0, 'YXZ');
+        M.compose(V, Q.setFromEuler(BE), S.set(b.s, b.s, b.s));
+        this.birdL.setMatrixAt(b.i, M);
+        BE.set(-flap, -heading, 0, 'YXZ');
+        M.compose(V, Q.setFromEuler(BE), S.set(b.s, b.s, -b.s));
+        this.birdR.setMatrixAt(b.i, M);
       }
     }
+    this.birdBody.instanceMatrix.needsUpdate = true;
+    this.birdL.instanceMatrix.needsUpdate = true;
+    this.birdR.instanceMatrix.needsUpdate = true;
   }
 
   // ---------------------------------------------------------------- sheep
@@ -252,3 +277,4 @@ const WING = (() => {
 })();
 const M = new THREE.Matrix4(), V = new THREE.Vector3(), Q = new THREE.Quaternion(), S = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+const BE = new THREE.Euler();

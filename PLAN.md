@@ -125,3 +125,17 @@ iPad, onboarding hints, settings panel.
 - Builds with `npm run build`, loads with no console errors.
 - Verified in headless Chromium (touch emulation, iPad Pro 13" viewport 1376×1032).
 - Committed and pushed so Pages redeploys.
+
+## Round 2 (feedback): Ghibli island, performance first
+
+- **R1 Big world** – 1024×1024 island, two mountain ranges, three rivers, chunked
+  terrain LOD with skirts, near/far tree LOD, batched glows/clouds/birds.
+- **R2 Human strokes** – world-anchored ink pressure, thickness, gaps, double
+  strokes and surface hatching (no shimmer while panning).
+- **R3 Seasons & wind** – shader-driven seasonal foliage (sakura, momiji, ginkgo),
+  golden autumn ground, snowy winter, gusting wind rippling grass and wildflowers,
+  drifting petals/leaves/snow/fireflies.
+- **R4 Japanese towns** – machiya, minka, kura, shrines & torii, pagodas, markets,
+  lanterns, flower beds, paddies, tea rows; Japanese stations; seaside railcar.
+- **R5 Natural sound** – soft layered wind, birdsong by season, cicadas, frogs,
+  crickets, owls, wind chimes, temple bell, koto-like music.

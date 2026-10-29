@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GeoBuilder, lc } from '../render/geo.js';
 import { toon } from '../render/materials.js';
-import { windowMat, lampMat, glowMat, labelTexture } from '../render/shared.js';
+import { windowMat, lampMat, glowPoints, labelTexture } from '../render/shared.js';
 import { Rng, clamp } from '../core/rng.js';
 import { HALF, N, WATER } from './terrain.js';
 import { SP } from './scenery.js';
@@ -351,13 +351,7 @@ export class Towns {
     }
     if (glass.n) grp.add(new THREE.Mesh(glass.build(), windowMat));
     if (lamps.n) grp.add(new THREE.Mesh(lamps.build(), lampMat));
-    town.lanterns.forEach((p, i) => {
-      if (i % 2) return;
-      const g = new THREE.Sprite(glowMat);
-      g.position.copy(p);
-      g.scale.setScalar(1.6);
-      grp.add(g);
-    });
+    if (town.lanterns.length) grp.add(glowPoints(town.lanterns));
     const lbl = labelTexture(town.name, { font: 'italic 700 60px Caveat, cursive', bg: 'rgba(240,232,210,0.85)' });
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: lbl.tex, transparent: true, depthTest: false, sizeAttenuation: false }));
     sp.scale.set((0.038 * lbl.w) / lbl.h, 0.038, 1);

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { windowMat, lampMat, glowMat, tailGlowMat } from './shared.js';
+import { windowMat, lampMat, glowMat, tailGlowMat, glowPointsMat } from './shared.js';
 
 // Keyframed palette through a day (hour -> colours). Painted, not physical.
 const KEYS = [
@@ -78,6 +78,8 @@ export class Sky {
     lampMat.color.set(n > 0.05 ? '#ffd27a' : '#efe6c8').lerp(ca.set('#efe6c8'), 1 - n);
     glowMat.opacity = n * 0.95;
     tailGlowMat.opacity = n * 0.9;
+    glowPointsMat.opacity = n * 0.9;
+    glowMat.visible = tailGlowMat.visible = glowPointsMat.visible = n > 0.01;
     this.lightsOn = n;
   }
 }
