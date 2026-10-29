@@ -165,3 +165,43 @@ button {
 
 #ui.relaxing > * { opacity: 0 !important; pointer-events: none !important; transition: opacity 0.8s; }
 #ui.relaxing > .toast.show { opacity: 1 !important; }
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(244, 236, 216, 0.35);
+  transition: opacity 0.5s;
+  z-index: 50;
+}
+.welcome.bye, .checklist.bye { opacity: 0; pointer-events: none; }
+.welcome-card {
+  width: min(600px, 90vw);
+  padding: 30px 38px 30px;
+  background-size: 100% 100%;
+  transform: rotate(-0.6deg);
+  animation: drop 0.7s cubic-bezier(.2,1.4,.4,1) both;
+}
+.welcome-card h1 { font-family: var(--title); font-size: 62px; margin: 0; line-height: 1; }
+.welcome-card .lede { font-size: 21px; margin: 6px 0 16px; opacity: 0.8; }
+.welcome-card .steps > div { display: flex; align-items: center; gap: 14px; font-size: 20px; margin: 10px 0; }
+.welcome-card .steps svg { width: 40px; height: 40px; flex: none; color: #8a2a1e; }
+.welcome-card .btn { margin: 16px auto 0; }
+@keyframes drop { from { transform: translateY(-40px) rotate(-3deg); opacity: 0; } to { transform: rotate(-0.6deg); opacity: 1; } }
+
+.checklist {
+  position: absolute;
+  left: calc(16px + var(--safe-l));
+  bottom: calc(126px + var(--safe-b));
+  padding: 12px 20px 14px;
+  background-size: 100% 100%;
+  font-size: 18px;
+  transition: opacity 0.8s;
+  pointer-events: none;
+}
+.checklist .ttl { font-family: var(--title); font-size: 30px; line-height: 1; margin-bottom: 4px; }
+.checklist .item { display: flex; align-items: center; gap: 10px; margin: 4px 0; }
+.checklist .box { width: 18px; height: 18px; border: 2.2px solid var(--ink); border-radius: 3px 5px 4px 6px; display: inline-grid; place-items: center; }
+.checklist .item.done { opacity: 0.6; text-decoration: line-through wavy rgba(43,42,51,0.5); }
+.checklist .item.done .box::after { content: '✓'; font-size: 20px; line-height: 1; color: #2f6b4f; margin-top: -4px; }

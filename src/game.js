@@ -20,6 +20,7 @@ import { Life } from './world/life.js';
 import { Effects } from './render/effects.js';
 import { AudioEngine } from './audio/audio.js';
 import { Passengers } from './stations/passengers.js';
+import { Onboarding } from './ui/onboarding.js';
 
 export class Game {
   constructor(container, uiRoot, say) {
@@ -129,6 +130,7 @@ export class Game {
       this.introCamera();
     }
     this.buildHud();
+    this.onboarding = new Onboarding(this);
     setInterval(() => this.autosave(), 15000);
     addEventListener('pagehide', () => this.autosave(true));
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.autosave(true); });
@@ -545,13 +547,37 @@ export class Game {
     this.sun.target.position.copy(t);
   }
 
+  // Keep the frame rate smooth on the iPad by nudging the render resolution.
+  adaptQuality(rdt) {
+    const q = this.quality || (this.quality = { acc: 0, n: 0, dpr: this.renderer.getPixelRatio(), max: Math.min(window.devicePixelRatio || 1, 2), cool: 3 });
+    q.acc += rdt;
+    q.n++;
+    q.cool -= rdt;
+    if (q.acc < 2) return;
+    const avg = q.acc / q.n;
+    q.acc = 0;
+    q.n = 0;
+    if (q.cool > 0 || document.hidden) return;
+    let next = q.dpr;
+    if (avg > 1 / 40 && q.dpr > 1) next = Math.max(1, q.dpr - 0.25);
+    else if (avg < 1 / 58 && q.dpr < q.max) next = Math.min(q.max, q.dpr + 0.25);
+    if (next !== q.dpr) {
+      q.dpr = next;
+      q.cool = 4;
+      this.renderer.setPixelRatio(next);
+      this.resize();
+    }
+  }
+
   frame() {
     const rdt = Math.min(this.clock.getDelta(), 0.1);
+    this.adaptQuality(rdt);
     const dt = rdt * this.settings.timeScale;
     this.time += rdt;
     this.updateRelax(rdt);
     this.rig.update(rdt);
     this.updateStats();
+    this.onboarding?.update();
     this.audio.update(rdt);
     this.updateSunShadow();
     this.water.uniforms.uTime.value = this.time;

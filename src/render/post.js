@@ -180,9 +180,12 @@ export class PostFX {
   constructor(renderer) {
     this.renderer = renderer;
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    const ext = renderer.extensions;
+    const half = ext.has('EXT_color_buffer_half_float') || ext.has('EXT_color_buffer_float');
     this.target = new THREE.WebGLRenderTarget(size.x, size.y, {
-      type: THREE.HalfFloatType,
-      samples: 4,
+      type: half ? THREE.HalfFloatType : THREE.UnsignedByteType,
+      // high-DPI screens are sharp enough; MSAA only when rendering below 1.5x
+      samples: renderer.getPixelRatio() >= 1.5 ? 0 : 4,
       depthBuffer: true,
     });
     this.target.depthTexture = new THREE.DepthTexture(size.x, size.y);
@@ -220,6 +223,11 @@ export class PostFX {
 
   setSize() {
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    const samples = this.renderer.getPixelRatio() >= 1.5 ? 0 : 4;
+    if (samples !== this.target.samples) {
+      this.target.samples = samples;
+      this.target.dispose();
+    }
     this.target.setSize(size.x, size.y);
     this.uniforms.uRes.value.copy(size);
     this.uniforms.uScale.value = this.renderer.getPixelRatio();

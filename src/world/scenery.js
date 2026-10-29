@@ -221,7 +221,8 @@ export class Scenery {
       const x = pts[i * 3], z = pts[i * 3 + 2];
       this.near(x, z, radius + 10, (it) => {
         const d = Math.hypot(it.x - x, it.z - z);
-        if (d < radius + (it.type === 'rock' ? it.s * 0.8 : 0.6) && !it.hidden) {
+        const reach = it.type === 'rock' ? it.s * 0.8 : it.type === 'flowers' ? 0.4 : it.type === 'bush' ? 0.7 * it.s : 1.15 * it.s;
+        if (d < radius + reach && !it.hidden) {
           it.hidden = true;
           this.removed.add(it.id);
         }

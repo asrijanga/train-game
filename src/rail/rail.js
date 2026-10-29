@@ -3,6 +3,9 @@ import { Network, other } from './network.js';
 import { resample, computeProfile, classify, applyEarthworks } from './earthworks.js';
 import { buildTrackMesh } from './trackmesh.js';
 import { VN } from '../world/terrain.js';
+import { GeoBuilder, lc } from '../render/geo.js';
+import { toon } from '../render/materials.js';
+import { tailGlowMat } from '../render/shared.js';
 
 const END_CLEAR = 2.5; // can't branch this close to an edge's end; snap to the node
 
@@ -16,6 +19,45 @@ export class RailSystem {
     this.group.name = 'rail';
     this.protect = new Uint8Array(VN * VN);
     this.net.on((ev) => this.onNetEvent(ev));
+    this.stops = new THREE.Group();
+    this.group.add(this.stops);
+  }
+
+  // Buffer stops wherever a line simply ends.
+  refreshBufferStops() {
+    for (const c of [...this.stops.children]) { this.stops.remove(c); if (c.geometry) c.geometry.dispose(); }
+    const gb = new GeoBuilder();
+    const red = lc('#b8322a'), white = lc('#f2ede0'), dark = lc('#3a393f'), wood = lc('#6b4a32');
+    const lamps = [];
+    for (const n of this.net.nodes.values()) {
+      const used = n.a.length ? 'a' : n.b.length ? 'b' : null;
+      if (!used || (n.a.length && n.b.length)) continue;
+      // direction from the end of the line back along the track
+      const o = n.outward(used);
+      const fx = -o.x, fz = -o.y; // the free side points away from the track
+      const X = new THREE.Vector3(fx, 0, fz), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(-fz, 0, fx);
+      const c = new THREE.Vector3(n.pos.x + fx * 0.3, n.pos.y, n.pos.z + fz * 0.3);
+      const at = (x, y, z) => ({ x: c.x + X.x * x + Z.x * z, y: c.y + y, z: c.z + X.z * x + Z.z * z });
+      gb.box(at(0.1, -0.05, 0), X, Y, Z, 0.25, 0.08, 0.55, wood);
+      for (const z of [-0.36, 0.36]) {
+        gb.box(at(0, 0.3, z), X, Y, Z, 0.07, 0.32, 0.07, dark);
+        gb.box(at(0.25, 0.25, z), X, Y, Z, 0.3, 0.04, 0.04, dark, false);
+      }
+      for (let i = 0; i < 6; i++) gb.box(at(-0.08, 0.5, -0.45 + i * 0.18 + 0.09), X, Y, Z, 0.06, 0.1, 0.09, i % 2 ? white : red);
+      for (const z of [-0.18, 0.18]) gb.box(at(-0.2, 0.47, z), X, Y, Z, 0.12, 0.05, 0.05, lc('#77736c'));
+      lamps.push(at(-0.05, 0.75, 0));
+      gb.box(at(-0.02, 0.68, 0), X, Y, Z, 0.05, 0.06, 0.05, dark);
+    }
+    if (!gb.n) return;
+    const mesh = new THREE.Mesh(gb.build(), toon('#ffffff', { vertexColors: true }));
+    mesh.castShadow = true;
+    this.stops.add(mesh);
+    for (const p of lamps) {
+      const s = new THREE.Sprite(tailGlowMat);
+      s.position.set(p.x, p.y, p.z);
+      s.scale.setScalar(0.7);
+      this.stops.add(s);
+    }
   }
 
   onNetEvent(ev) {
@@ -27,6 +69,8 @@ export class RailSystem {
       this.buildView(ev.e2);
     }
     this.game.onNetworkChanged?.(ev);
+    clearTimeout(this._bsT);
+    this._bsT = setTimeout(() => this.refreshBufferStops(), 0);
   }
 
   buildView(edge) {
